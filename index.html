@@ -6,108 +6,217 @@
     <meta name="theme-color" content="#667eea">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>🏃 运动记录 - 每日步数与跑步</title>
+    <meta name="description" content="运动记录App - 步数统计、GPS跑步轨迹记录">
+    <title>🏃 运动记录</title>
     <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏃</text></svg>">
     <link rel="stylesheet" href="styles.css">
+    <!-- 高德地图 JS API - 请替换为您申请的高德 Web JS API Key -->
+    <!-- 申请地址: https://console.amap.com/dev/key/app -->
+    <script src="https://webapi.amap.com/maps?v=2.0&key=YOUR_AMAP_API_KEY_HERE&plugin=AMap.Scale,AMap.HawkEye,AMap.ToolBar"></script>
+    <style>
+        /* Critical: Amap container must have explicit size */
+        #amapContainer { width: 100%; height: 100%; }
+        .map-loading { display: flex; align-items: center; justify-content: center; height: 100%; color: #888; font-size: 14px; }
+    </style>
 </head>
 <body>
     <div id="app">
-        <!-- 顶部标题 -->
-        <header class="header">
-            <h1>🏃 运动记录</h1>
-            <p class="date" id="currentDate"></p>
-        </header>
+        <!-- ====== 今日页面 ====== -->
+        <div class="page active" id="pageHome">
+            <header class="header">
+                <h1>🏃 运动记录</h1>
+                <p class="date" id="currentDate"></p>
+            </header>
 
-        <!-- 步数卡片 -->
-        <section class="card step-card">
-            <div class="step-main">
-                <div class="step-circle" id="stepCircle">
-                    <span class="step-num" id="stepCount">0</span>
-                    <span class="step-unit">步</span>
-                </div>
-                <div class="step-info">
-                    <div class="target-bar">
-                        <div class="target-progress" id="targetProgress" style="width: 0%"></div>
+            <!-- 步数卡片 -->
+            <section class="card step-card">
+                <div class="step-main">
+                    <div class="step-circle" id="stepCircle">
+                        <span class="step-num" id="stepCount">0</span>
+                        <span class="step-unit">步</span>
                     </div>
-                    <p class="target-text">目标 <span id="stepTarget">10,000</span> 步</p>
-                    <p class="target-percent" id="targetPercent">0%</p>
+                    <div class="step-info">
+                        <div class="target-bar">
+                            <div class="target-progress" id="targetProgress" style="width:0%"></div>
+                        </div>
+                        <p class="target-text">目标 <span id="stepTarget">10,000</span> 步</p>
+                        <p class="target-percent" id="targetPercent">0%</p>
+                    </div>
                 </div>
-            </div>
-            <div class="step-stats">
-                <div class="stat-item">
-                    <span class="stat-icon">🔥</span>
-                    <span class="stat-val" id="calories">0</span>
-                    <span class="stat-label">千卡</span>
+                <div class="step-stats">
+                    <div class="stat-item">
+                        <span class="stat-icon">🔥</span>
+                        <span class="stat-val" id="calories">0</span>
+                        <span class="stat-label">千卡</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-icon">⏱️</span>
+                        <span class="stat-val" id="activeTime">0</span>
+                        <span class="stat-label">活跃分钟</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-icon">📍</span>
+                        <span class="stat-val" id="distance">0</span>
+                        <span class="stat-label">公里</span>
+                    </div>
                 </div>
-                <div class="stat-item">
-                    <span class="stat-icon">⏱️</span>
-                    <span class="stat-val" id="activeTime">0</span>
-                    <span class="stat-label">活跃分钟</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-icon">📍</span>
-                    <span class="stat-val" id="distance">0</span>
-                    <span class="stat-label">公里</span>
-                </div>
-            </div>
-        </section>
+            </section>
 
-        <!-- 操作按钮 -->
-        <section class="actions">
-            <button class="btn btn-primary" id="startRunBtn">
-                🏃 开始跑步
-            </button>
-            <button class="btn btn-secondary" id="settingsBtn">
-                ⚙️ 设置
-            </button>
-        </section>
+            <!-- 操作按钮 -->
+            <section class="actions">
+                <button class="btn btn-primary btn-large" id="startRunBtn">
+                    🏃 开始跑步
+                </button>
+                <button class="btn btn-secondary" id="settingsBtn">
+                    ⚙️ 设置
+                </button>
+            </section>
 
-        <!-- 今日历史 -->
-        <section class="card history-card">
-            <h2>📅 今日记录</h2>
-            <div id="todayHistory">
-                <p class="empty-state">暂无记录，开始你的第一次运动吧！</p>
-            </div>
-        </section>
+            <!-- 今日历史 -->
+            <section class="card history-card">
+                <h2>📅 今日记录</h2>
+                <div id="todayHistory">
+                    <p class="empty-state">暂无记录，开始你的第一次运动吧！</p>
+                </div>
+            </section>
 
-        <!-- 周统计 -->
-        <section class="card week-card">
-            <h2>📊 本周数据</h2>
-            <div class="week-chart" id="weekChart"></div>
-            <div class="week-summary">
-                <div class="summary-item">
-                    <span>本周总步数</span>
-                    <strong id="weekSteps">0</strong>
+            <!-- 周统计预览 -->
+            <section class="card week-card">
+                <h2>📊 本周数据</h2>
+                <div class="week-chart" id="weekChartPreview"></div>
+                <div class="week-summary">
+                    <div class="summary-item">
+                        <span>本周总步数</span>
+                        <strong id="weekSteps">0</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>本周跑步</span>
+                        <strong id="weekRuns">0</strong> 次
+                    </div>
+                    <div class="summary-item">
+                        <span>本周里程</span>
+                        <strong id="weekDistance">0</strong> km
+                    </div>
                 </div>
-                <div class="summary-item">
-                    <span>本周跑步</span>
-                    <strong id="weekRuns">0</strong> 次
-                </div>
+            </section>
+        </div>
+
+        <!-- ====== 历史页面 ====== -->
+        <div class="page" id="pageHistory">
+            <header class="header">
+                <h1>📋 历史记录</h1>
+                <p class="subtitle">所有跑步记录</p>
+            </header>
+
+            <div class="history-filters">
+                <select id="historyMonthFilter" class="filter-select">
+                    <option value="">全部月份</option>
+                </select>
             </div>
-        </section>
+
+            <div class="history-list" id="historyList">
+                <p class="empty-state">暂无历史记录</p>
+            </div>
+        </div>
+
+        <!-- ====== 统计页面 ====== -->
+        <div class="page" id="pageStats">
+            <header class="header">
+                <h1>📈 运动统计</h1>
+                <p class="subtitle">查看你的运动数据</p>
+            </header>
+
+            <!-- 总览卡片 -->
+            <section class="card stats-overview">
+                <div class="overview-grid">
+                    <div class="overview-item">
+                        <span class="overview-icon">🏃</span>
+                        <span class="overview-val" id="totalRuns">0</span>
+                        <span class="overview-label">总跑步次数</span>
+                    </div>
+                    <div class="overview-item">
+                        <span class="overview-icon">📍</span>
+                        <span class="overview-val" id="totalDistance">0</span>
+                        <span class="overview-label">总里程(km)</span>
+                    </div>
+                    <div class="overview-item">
+                        <span class="overview-icon">⏱️</span>
+                        <span class="overview-val" id="totalDuration">0</span>
+                        <span class="overview-label">总时长(分钟)</span>
+                    </div>
+                    <div class="overview-item">
+                        <span class="overview-icon">⚡</span>
+                        <span class="overview-val" id="avgPace">--:--</span>
+                        <span class="overview-label">平均配速(/km)</span>
+                    </div>
+                    <div class="overview-item">
+                        <span class="overview-icon">🔥</span>
+                        <span class="overview-val" id="totalCalories">0</span>
+                        <span class="overview-label">消耗千卡</span>
+                    </div>
+                    <div class="overview-item">
+                        <span class="overview-icon">👣</span>
+                        <span class="overview-val" id="totalSteps">0</span>
+                        <span class="overview-label">总步数</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 周柱状图 -->
+            <section class="card chart-card">
+                <h2>📊 本周跑步里程</h2>
+                <div class="chart-container">
+                    <canvas id="weekChartCanvas" height="180"></canvas>
+                </div>
+                <div class="chart-legend">
+                    <span class="legend-item"><span class="legend-dot" style="background:#667eea"></span>跑步里程(km)</span>
+                </div>
+            </section>
+
+            <!-- 月柱状图 -->
+            <section class="card chart-card">
+                <h2>📊 本月跑步天数</h2>
+                <div class="month-grid" id="monthDaysGrid"></div>
+            </section>
+
+            <!-- 月度趋势 -->
+            <section class="card chart-card">
+                <h2>📈 月度里程趋势</h2>
+                <div class="chart-container">
+                    <canvas id="monthTrendCanvas" height="160"></canvas>
+                </div>
+                <div class="chart-legend">
+                    <span class="legend-item"><span class="legend-dot" style="background:#48bb78"></span>月度里程</span>
+                </div>
+            </section>
+        </div>
 
         <!-- 底部导航 -->
         <nav class="bottom-nav">
-            <button class="nav-item active" id="navToday">
+            <button class="nav-item active" data-page="pageHome">
                 <span class="nav-icon">🏠</span>
                 <span>今日</span>
             </button>
-            <button class="nav-item" id="navHistory">
+            <button class="nav-item" data-page="pageHistory">
                 <span class="nav-icon">📋</span>
                 <span>历史</span>
             </button>
-            <button class="nav-item" id="navStats">
+            <button class="nav-item" data-page="pageStats">
                 <span class="nav-icon">📈</span>
                 <span>统计</span>
             </button>
         </nav>
     </div>
 
-    <!-- 跑步中弹窗 -->
+    <!-- ====== 跑步中弹窗 ====== -->
     <div class="modal" id="runModal" style="display:none">
-        <div class="modal-content run-active">
+        <div class="modal-content run-modal-content">
             <div class="run-header">
-                <h2>🏃 跑步进行中</h2>
+                <div class="run-header-top">
+                    <h2>🏃 跑步进行中</h2>
+                    <button class="btn-close" onclick="stopRun()">✕</button>
+                </div>
                 <span class="run-time" id="runTime">00:00</span>
             </div>
             <div class="run-stats-grid">
@@ -117,46 +226,76 @@
                 </div>
                 <div class="run-stat">
                     <span class="run-stat-val" id="runPace">--:--</span>
-                    <span class="run-stat-label">配速</span>
+                    <span class="run-stat-label">配速 /km</span>
                 </div>
                 <div class="run-stat">
                     <span class="run-stat-val" id="runSpeed">0.0</span>
                     <span class="run-stat-label">公里/时</span>
                 </div>
             </div>
-            <div class="run-map" id="runMap">
-                <div class="map-placeholder" id="mapPlaceholder">
-                    📍 GPS定位中...
-                </div>
-                <canvas id="trackCanvas"></canvas>
+            <!-- 高德地图容器 -->
+            <div class="run-map-container" id="runMapContainer">
+                <div id="amapContainer" style="width:100%;height:100%;position:relative;"></div>
+                <div class="gps-status" id="gpsStatus">📡 GPS定位中...</div>
             </div>
             <div class="run-actions">
-                <button class="btn btn-danger" onclick="stopRun()">停止跑步</button>
+                <button class="btn btn-danger btn-large" onclick="stopRun()">🛑 停止跑步</button>
             </div>
         </div>
     </div>
 
-    <!-- 设置弹窗 -->
+    <!-- ====== 跑步详情弹窗 ====== -->
+    <div class="modal" id="runDetailModal" style="display:none">
+        <div class="modal-content detail-modal">
+            <div class="detail-header">
+                <button class="btn-back" onclick="closeRunDetail()">← 返回</button>
+                <h2 id="detailTitle">跑步详情</h2>
+                <button class="btn-delete" id="deleteRunBtn" title="删除记录">🗑️</button>
+            </div>
+            <div class="detail-map" id="detailMapContainer">
+                <div id="detailAmapContainer" style="width:100%;height:100%;"></div>
+            </div>
+            <div class="detail-stats" id="detailStats"></div>
+        </div>
+    </div>
+
+    <!-- ====== 设置弹窗 ====== -->
     <div class="modal" id="settingsModal" style="display:none">
         <div class="modal-content">
-            <h2>⚙️ 设置</h2>
-            <div class="setting-item">
-                <label>每日步数目标</label>
-                <input type="number" id="settingStepTarget" value="10000" min="1000" max="50000">
+            <div class="modal-header">
+                <h2>⚙️ 设置</h2>
+                <button class="btn-close" onclick="closeSettings()">✕</button>
             </div>
             <div class="setting-item">
-                <label>跑步目标（公里）</label>
-                <input type="number" id="settingRunTarget" value="5" min="0.1" max="100" step="0.1">
+                <label>每日步数目标</label>
+                <input type="number" id="settingStepTarget" value="10000" min="1000" max="50000" step="500">
             </div>
             <div class="setting-item">
                 <label>步长（厘米）</label>
                 <input type="number" id="settingStepLength" value="70" min="40" max="120">
+            </div>
+            <div class="setting-item">
+                <label>高德地图 API Key</label>
+                <input type="text" id="settingAmapKey" placeholder="请输入您的高德 API Key">
+                <p class="setting-hint">申请地址: <a href="https://console.amap.com/dev/key/app" target="_blank">高德开放平台</a></p>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="closeSettings()">取消</button>
                 <button class="btn btn-primary" onclick="saveSettings()">保存</button>
             </div>
         </div>
+    </div>
+
+    <!-- ====== PWA 更新提示 ====== -->
+    <div class="update-toast" id="updateToast" style="display:none">
+        <div class="update-content">
+            <span class="update-icon">🔄</span>
+            <div class="update-text">
+                <strong>发现新版本</strong>
+                <p>应用已更新，点击刷新以获取最新功能</p>
+            </div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="updateBtn">立即更新</button>
     </div>
 
     <script src="app.js"></script>
