@@ -1281,6 +1281,7 @@ body.running .step-circle {
 /* 图表卡片 */
 .chart-card {
     padding-bottom: 12px;
+    overflow: hidden;
 }
 
 .chart-container {
