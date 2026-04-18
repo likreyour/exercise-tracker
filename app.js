@@ -516,6 +516,9 @@ function init() {
     // 模拟步数（桌面端测试用）
     simulateSteps();
     
+    // 绑定按钮事件（iOS Safari 需要用户交互触发）
+    bindButtonEvents();
+    
     console.log('🏃 运动记录App已初始化完成');
 }
 
@@ -551,6 +554,48 @@ window.addEventListener('beforeunload', () => {
     
     saveData(data);
 });
+
+// 绑定按钮事件
+function bindButtonEvents() {
+    console.log('绑定按钮事件');
+    
+    // 开始跑步按钮
+    const startRunBtn = document.getElementById('startRunBtn');
+    if (startRunBtn) {
+        startRunBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('点击开始跑步');
+            startRun();
+        });
+        console.log('开始跑步按钮已绑定');
+    }
+    
+    // 设置按钮
+    const settingsBtn = document.getElementById('settingsBtn');
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('点击设置');
+            openSettings();
+        });
+        console.log('设置按钮已绑定');
+    }
+    
+    // 底部导航
+    const navToday = document.getElementById('navToday');
+    const navHistory = document.getElementById('navHistory');
+    const navStats = document.getElementById('navStats');
+    
+    if (navToday) {
+        navToday.addEventListener('click', function() { showTab('today'); });
+    }
+    if (navHistory) {
+        navHistory.addEventListener('click', function() { showTab('history'); });
+    }
+    if (navStats) {
+        navStats.addEventListener('click', function() { showTab('stats'); });
+    }
+}
 
 // 启动 - 等待DOM加载完成
 if (document.readyState === 'loading') {

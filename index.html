@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <meta name="theme-color" content="#667eea">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -54,10 +54,10 @@
 
         <!-- 操作按钮 -->
         <section class="actions">
-            <button class="btn btn-primary" id="startRun" onclick="startRun()">
+            <button class="btn btn-primary" id="startRunBtn">
                 🏃 开始跑步
             </button>
-            <button class="btn btn-secondary" onclick="openSettings()">
+            <button class="btn btn-secondary" id="settingsBtn">
                 ⚙️ 设置
             </button>
         </section>
@@ -88,15 +88,15 @@
 
         <!-- 底部导航 -->
         <nav class="bottom-nav">
-            <button class="nav-item active" onclick="showTab('today')">
+            <button class="nav-item active" id="navToday">
                 <span class="nav-icon">🏠</span>
                 <span>今日</span>
             </button>
-            <button class="nav-item" onclick="showTab('history')">
+            <button class="nav-item" id="navHistory">
                 <span class="nav-icon">📋</span>
                 <span>历史</span>
             </button>
-            <button class="nav-item" onclick="showTab('stats')">
+            <button class="nav-item" id="navStats">
                 <span class="nav-icon">📈</span>
                 <span>统计</span>
             </button>
