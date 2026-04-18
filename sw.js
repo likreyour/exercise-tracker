@@ -3,7 +3,7 @@
  * 功能：离线缓存 + PWA自动更新提示 + 更好的缓存策略
  */
 
-const CACHE_NAME = 'exercise-tracker-v3';
+const CACHE_NAME = 'exercise-tracker-v4';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -85,7 +85,8 @@ function getRequestStrategy(request) {
 async function networkFirst(request) {
     try {
         const response = await fetch(request);
-        if (response && response.status === 200) {
+        // Cache successful responses regardless of status code (for CORS)
+        if (response && response.status >= 200 && response.status < 400) {
             const cache = await caches.open(CACHE_NAME);
             cache.put(request, response.clone());
         }
@@ -141,6 +142,13 @@ self.addEventListener('fetch', event => {
 
     // 跳过 chrome-extension 和其他特殊协议
     if (!url.protocol.startsWith('http')) return;
+
+    // 强制网络优先：始终从网络获取最新内容
+    // 这是 SPA，index.html 必须始终获取最新版本
+    if (url.origin === self.location.origin && (url.pathname === '/' || url.pathname.endsWith('/index.html') || url.pathname.endsWith('.html'))) {
+        event.respondWith(networkFirst(event.request));
+        return;
+    }
 
     const strategy = getRequestStrategy(event.request);
 

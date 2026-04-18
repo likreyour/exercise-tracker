@@ -14,7 +14,8 @@ const DEFAULT_SETTINGS = {
     stepTarget: 10000,
     stepLength: 70,
     amapKey: '',
-    autoAnnounce: true
+    autoAnnounce: true,
+    mapProvider: 'amap'
 };
 
 const DEFAULT_LAST_RUN = {
@@ -43,6 +44,12 @@ let amapStartMarker = null;
 let amapEndMarker = null;
 let amapCurrentMarker = null;
 let amap跑步路径 = [];
+
+// ============ OSM (OpenStreetMap) 地图变量 ============
+let osmMap = null;
+let osmPolyline = null;
+let osmStartMarker = null;
+let osmCurrentMarker = null;
 
 let lastAnnouncedKm = 0;
 let currentRunId = null;
@@ -261,7 +268,23 @@ async function startRun() {
         document.body.classList.add('running');
     }
 
-    initAmapMap();
+    // 根据用户设置的地图提供商初始化地图
+    const settings = getSettings();
+    if (settings.mapProvider === 'osm') {
+        // OpenStreetMap
+        const amapContainer = document.getElementById('amapContainer');
+        const osmContainer = document.getElementById('osmContainer');
+        if (amapContainer) amapContainer.style.display = 'none';
+        if (osmContainer) osmContainer.style.display = 'block';
+        initOSMMap();
+    } else {
+        // 高德地图（默认）
+        const amapContainer = document.getElementById('amapContainer');
+        const osmContainer = document.getElementById('osmContainer');
+        if (amapContainer) amapContainer.style.display = 'block';
+        if (osmContainer) osmContainer.style.display = 'none';
+        initAmapMap();
+    }
     runTimer = setInterval(updateRunTime, 1000);
 
     runWatchId = navigator.geolocation.watchPosition(
@@ -274,13 +297,6 @@ async function startRun() {
 }
 
 function initAmapMap() {
-    const key = getAmapKey();
-    if (!key) {
-        const status = document.getElementById('gpsStatus');
-        if (status) status.textContent = '⚠️ 请先在设置中配置高德地图 API Key';
-        return;
-    }
-
     if (typeof AMap === 'undefined') {
         console.warn('高德地图 SDK 未加载');
         const status = document.getElementById('gpsStatus');
@@ -322,6 +338,63 @@ function initAmapMap() {
     }
 }
 
+function initOSMMap() {
+    const container = document.getElementById('osmContainer');
+    if (!container) return;
+
+    // 销毁旧地图实例
+    if (osmMap) {
+        try { osmMap.remove(); } catch (e) {}
+        osmMap = null;
+    }
+
+    // 初始化 Leaflet 地图
+    osmMap = L.map('osmContainer').setView([0, 0], 17);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(osmMap);
+
+    // 初始化轨迹线
+    osmPolyline = L.polyline([], {color: '#667eea', weight: 6}).addTo(osmMap);
+    osmStartMarker = null;
+    osmCurrentMarker = null;
+
+    const status = document.getElementById('gpsStatus');
+    if (status) {
+        status.textContent = '📡 GPS定位中...';
+        status.classList.remove('active');
+    }
+}
+
+function updateOSMPosition(lat, lng) {
+    if (!osmMap) initOSMMap();
+    if (!osmMap) return;
+
+    // 移动地图中心
+    osmMap.setView([lat, lng], 17);
+
+    // 添加或更新当前位置标记
+    if (osmCurrentMarker) {
+        osmCurrentMarker.setLatLng([lat, lng]);
+    } else {
+        osmCurrentMarker = L.circleMarker([lat, lng], {
+            radius: 8,
+            fillColor: '#667eea',
+            color: '#fff',
+            weight: 2
+        }).addTo(osmMap);
+    }
+
+    // 更新轨迹线
+    const path = getRunPath();
+    osmPolyline.setLatLngs(path.map(p => [p.lat, p.lng]));
+}
+
+function getRunPath() {
+    return runPath;
+}
+
 function updateRunPosition(position) {
     const { latitude, longitude, speed, accuracy } = position.coords;
     const currentPos = { lat: latitude, lng: longitude, time: Date.now() };
@@ -350,32 +423,48 @@ function updateRunPosition(position) {
     runPath.push(currentPos);
     lastPosition = currentPos;
 
-    if (amapMap) {
-        const lngLat = new AMap.LngLat(longitude, latitude);
-        amap跑步路径.push(lngLat);
-        amapPolyline.setPath(amap跑步路径);
+    // 根据地图类型更新对应地图
+    const settings = getSettings();
+    if (settings.mapProvider === 'osm') {
+        // 更新 OpenStreetMap
+        if (!osmStartMarker && runPath.length === 1) {
+            osmStartMarker = L.circleMarker([latitude, longitude], {
+                radius: 8,
+                fillColor: '#48bb78',
+                color: '#fff',
+                weight: 2
+            }).addTo(osmMap);
+        }
+        updateOSMPosition(latitude, longitude);
+    } else {
+        // 更新高德地图
+        if (amapMap) {
+            const lngLat = new AMap.LngLat(longitude, latitude);
+            amap跑步路径.push(lngLat);
+            amapPolyline.setPath(amap跑步路径);
 
-        if (!amapStartMarker && amap跑步路径.length === 1) {
-            amapStartMarker = new AMap.Marker({
+            if (!amapStartMarker && amap跑步路径.length === 1) {
+                amapStartMarker = new AMap.Marker({
+                    position: lngLat,
+                    icon: new AMap.Icon({
+                        size: new AMap.Size(24, 24),
+                        image: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="12" fill="#48bb78"/><text x="12" y="16" text-anchor="middle" font-size="12">🚩</text></svg>')
+                    })
+                });
+                amapMap.add(amapStartMarker);
+            }
+
+            if (amapCurrentMarker) amapMap.remove(amapCurrentMarker);
+            amapCurrentMarker = new AMap.Marker({
                 position: lngLat,
                 icon: new AMap.Icon({
-                    size: new AMap.Size(24, 24),
-                    image: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="12" fill="#48bb78"/><text x="12" y="16" text-anchor="middle" font-size="12">🚩</text></svg>')
+                    size: new AMap.Size(20, 20),
+                    image: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="10" fill="#fc8181"/><text x="10" y="14" text-anchor="middle" font-size="10">🏃</text></svg>')
                 })
             });
-            amapMap.add(amapStartMarker);
+            amapMap.add(amapCurrentMarker);
+            amapMap.setCenter(lngLat);
         }
-
-        if (amapCurrentMarker) amapMap.remove(amapCurrentMarker);
-        amapCurrentMarker = new AMap.Marker({
-            position: lngLat,
-            icon: new AMap.Icon({
-                size: new AMap.Size(20, 20),
-                image: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="10" fill="#fc8181"/><text x="10" y="14" text-anchor="middle" font-size="10">🏃</text></svg>')
-            })
-        });
-        amapMap.add(amapCurrentMarker);
-        amapMap.setCenter(lngLat);
     }
 
     updateRunStats();
@@ -481,6 +570,7 @@ function stopRun() {
     lastPosition = null;
     amap跑步路径 = [];
 
+    cleanupOSM();
     updateTodayHistory();
     updateWeekStatsPreview();
 }
@@ -494,6 +584,16 @@ function cleanupAmap() {
     amapStartMarker = null;
     amapEndMarker = null;
     amapCurrentMarker = null;
+}
+
+function cleanupOSM() {
+    if (osmMap) {
+        try { osmMap.remove(); } catch (e) {}
+        osmMap = null;
+    }
+    osmPolyline = null;
+    osmStartMarker = null;
+    osmCurrentMarker = null;
 }
 
 // ============ 历史记录 ============
@@ -1195,11 +1295,15 @@ function openSettings() {
     const amapKeyEl = document.getElementById('settingAmapKey');
     const autoAnnounceEl = document.getElementById('settingAutoAnnounce');
     const modal = document.getElementById('settingsModal');
+    const amapRadio = document.getElementById('mapProviderAmap');
+    const osmRadio = document.getElementById('mapProviderOsm');
 
     if (stepTargetEl) stepTargetEl.value = settings.stepTarget;
     if (stepLengthEl) stepLengthEl.value = settings.stepLength;
     if (amapKeyEl) amapKeyEl.value = settings.amapKey || '';
     if (autoAnnounceEl) autoAnnounceEl.checked = settings.autoAnnounce !== false;
+    if (amapRadio) amapRadio.checked = settings.mapProvider !== 'osm';
+    if (osmRadio) osmRadio.checked = settings.mapProvider === 'osm';
     if (modal) modal.style.display = 'flex';
 }
 
@@ -1209,11 +1313,13 @@ function closeSettings() {
 }
 
 function saveSettingsHandler() {
+    const mapProviderEl = document.querySelector('input[name="mapProvider"]:checked');
     const newSettings = {
         stepTarget: parseInt(document.getElementById('settingStepTarget').value) || 10000,
         stepLength: parseInt(document.getElementById('settingStepLength').value) || 70,
         amapKey: (document.getElementById('settingAmapKey').value || '').trim(),
-        autoAnnounce: document.getElementById('settingAutoAnnounce').checked
+        autoAnnounce: document.getElementById('settingAutoAnnounce').checked,
+        mapProvider: mapProviderEl ? mapProviderEl.value : 'amap'
     };
     saveSettings(newSettings);
     updateStepDisplay();
