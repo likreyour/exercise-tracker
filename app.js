@@ -28,8 +28,11 @@ const DEFAULT_LAST_RUN = {
 let stepCount = 0;
 let lastAcceleration = { x: 0, y: 0, z: 0 };
 let isStepDetecting = false;
-let stepDetectionThreshold = 12;
+let stepDetectionThreshold = 18;
 let simulatedSteps = 0;
+let lastStepTime = 0;
+const STEP_COOLDOWN_MS = 300;
+const MIN_ACCELERATION_CHANGE = 1.5;
 
 let isRunning = false;
 let runStartTime = null;
@@ -176,8 +179,15 @@ function handleDeviceMotion(event) {
         Math.pow(z - lastAcceleration.z, 2)
     );
 
-    if (delta > stepDetectionThreshold && delta < 50) {
+    // 冷却时间内不计数
+    if (Date.now() - lastStepTime < STEP_COOLDOWN_MS) {
+        lastAcceleration = { x, y, z };
+        return;
+    }
+
+    if (delta > stepDetectionThreshold && delta < 50 && delta > MIN_ACCELERATION_CHANGE) {
         stepCount++;
+        lastStepTime = Date.now();
         updateStepDisplay();
     }
 
@@ -186,10 +196,8 @@ function handleDeviceMotion(event) {
 
 // 桌面端模拟步数
 function simulateSteps() {
-    if ('ontouchstart' in window || 'ontouchmove' in window) {
-        // 真实移动设备不模拟
-        return;
-    }
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) return;
     console.log('桌面设备，运行步数模拟');
     setInterval(() => {
         if (!isRunning) {
@@ -1366,10 +1374,22 @@ function setupUpdatePrompt() {
     }
 }
 
+// 隐藏加载画面
+function hideLoadingScreen() {
+    const screen = document.getElementById('appLoadingScreen');
+    if (screen) {
+        screen.classList.add('hidden');
+        // Remove from DOM after transition
+        setTimeout(() => {
+            if (screen.parentNode) screen.parentNode.removeChild(screen);
+        }, 600);
+    }
+}
+
 function showUpdatePrompt() {
     const toast = document.getElementById('updateToast');
     if (toast) {
-        toast.style.display = 'flex';
+        toast.classList.add('visible');
         document.getElementById('updateBtn').onclick = () => {
             newServiceWorker && newServiceWorker.postMessage({ type: 'SKIP_WAITING' });
             window.location.reload();
@@ -1521,9 +1541,16 @@ window.addEventListener('beforeunload', () => {
     saveData(data);
 });
 
-// 启动
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-} else {
+// 启动 + 隐藏加载画面
+function safeStart() {
     init();
+    // 延迟隐藏加载画面，确保首帧渲染
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => hideLoadingScreen());
+    });
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', safeStart);
+} else {
+    safeStart();
 }

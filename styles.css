@@ -1500,3 +1500,29 @@ body.running .step-circle {
         padding-top: max(20px, env(safe-area-inset-top));
     }
 }
+
+/* ============ Loading Screen Animations ============ */
+@keyframes loadingPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+}
+@keyframes loadingSpin {
+    to { transform: rotate(360deg); }
+}
+
+
+/* Show state for update toast (JS adds .visible class) */
+.update-toast.visible {
+    transform: translateX(-50%) translateY(0);
+    animation: slideDown 0.4s ease forwards;
+}
+
+
+/* ============ Loading Screen Animations ============ */
+@keyframes loadingPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+}
+@keyframes loadingSpin {
+    to { transform: rotate(360deg); }
+}
