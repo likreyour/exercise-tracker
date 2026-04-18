@@ -2,25 +2,93 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#667eea">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="运动记录">
     <meta name="description" content="运动记录App - 步数统计、GPS跑步轨迹记录">
+    <!-- iOS 启动画面 (Splash Screen) -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-startup-image" 
+          href="icon-512.svg" 
+          media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)">
+    <link rel="apple-touch-startup-image" 
+          href="icon-512.svg" 
+          media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)">
+    <link rel="apple-touch-startup-image" 
+          href="icon-512.svg" 
+          media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)">
+    <link rel="apple-touch-startup-image" 
+          href="icon-512.svg" 
+          media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)">
+    <link rel="apple-touch-startup-image" 
+          href="icon-512.svg" 
+          media="(min-device-width: 768px) and (max-device-width: 1024px)">
     <title>🏃 运动记录</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏃</text></svg>">
+    <!-- 应用图标 -->
+    <link rel="icon" type="image/svg+xml" href="icon-192.svg">
+    <link rel="apple-touch-icon" href="icon-192.svg">
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.svg">
+    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.svg">
     <link rel="stylesheet" href="styles.css">
-    <!-- 高德地图 JS API - 请替换为您申请的高德 Web JS API Key -->
-    <!-- 申请地址: https://console.amap.com/dev/key/app -->
+    <!-- Leaflet CSS (OpenStreetMap) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- 高德地图 JS API -->
     <script src="https://webapi.amap.com/maps?v=2.0&key=012ff183fe509c866b566ab69681289a&plugin=AMap.Scale,AMap.HawkEye,AMap.ToolBar"></script>
+    <!-- Leaflet JS (OpenStreetMap) -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        /* Critical: Amap container must have explicit size */
         #amapContainer { width: 100%; height: 100%; }
         .map-loading { display: flex; align-items: center; justify-content: center; height: 100%; color: #888; font-size: 14px; }
+        /* Loading skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+        @keyframes skeleton-shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        .skeleton-text { height: 14px; margin-bottom: 8px; }
+        .skeleton-circle { width: 130px; height: 130px; border-radius: 50%; }
+        /* Page transition */
+        .page-transitioning { opacity: 0.5; pointer-events: none; }
+        /* Toast notification */
+        .toast-notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: var(--white);
+            color: var(--dark);
+            padding: 12px 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+            z-index: 9999;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            max-width: calc(100% - 40px);
+        }
+        .toast-notification.show {
+            transform: translateX(-50%) translateY(0);
+        }
     </style>
 </head>
 <body>
+    <!-- 全局 Toast 通知 -->
+    <div class="toast-notification" id="globalToast">
+        <span id="toastIcon">✅</span>
+        <span id="toastMessage">操作成功</span>
+    </div>
+
     <div id="app">
         <!-- ====== 今日页面 ====== -->
         <div class="page active" id="pageHome">
@@ -33,8 +101,14 @@
             <section class="card step-card">
                 <div class="step-main">
                     <div class="step-circle" id="stepCircle">
-                        <span class="step-num" id="stepCount">0</span>
-                        <span class="step-unit">步</span>
+                        <svg class="step-ring-svg" viewBox="0 0 130 130">
+                            <circle class="ring-bg" cx="65" cy="65" r="58"/>
+                            <circle class="ring-progress" cx="65" cy="65" r="58" id="stepRingProgress"/>
+                        </svg>
+                        <div class="step-content">
+                            <span class="step-num" id="stepCount">0</span>
+                            <span class="step-unit">步</span>
+                        </div>
                     </div>
                     <div class="step-info">
                         <div class="target-bar">
@@ -77,7 +151,7 @@
             <section class="card history-card">
                 <h2>📅 今日记录</h2>
                 <div id="todayHistory">
-                    <p class="empty-state">暂无记录，开始你的第一次运动吧！</p>
+                    <div class="empty-state">暂无记录，开始你的第一次运动吧！</div>
                 </div>
             </section>
 
@@ -109,10 +183,22 @@
                 <p class="subtitle">所有跑步记录</p>
             </header>
 
-            <div class="history-filters">
-                <select id="historyMonthFilter" class="filter-select">
-                    <option value="">全部月份</option>
-                </select>
+            <!-- 操作栏 -->
+            <div class="history-actions-bar">
+                <div class="history-filters">
+                    <select id="historyMonthFilter" class="filter-select">
+                        <option value="">全部月份</option>
+                    </select>
+                </div>
+                <button class="btn btn-outline btn-sm" id="exportDataBtn" title="导出数据">
+                    📤 导出
+                </button>
+            </div>
+
+            <!-- 加载状态 -->
+            <div class="loading-overlay" id="historyLoading" style="display:none">
+                <div class="spinner"></div>
+                <span>加载中...</span>
             </div>
 
             <div class="history-list" id="historyList">
@@ -215,7 +301,7 @@
             <div class="run-header">
                 <div class="run-header-top">
                     <h2>🏃 跑步进行中</h2>
-                    <button class="btn-close" onclick="stopRun()">✕</button>
+                    <button class="btn-close" id="closeRunBtn">✕</button>
                 </div>
                 <span class="run-time" id="runTime">00:00</span>
             </div>
@@ -233,13 +319,25 @@
                     <span class="run-stat-label">公里/时</span>
                 </div>
             </div>
-            <!-- 高德地图容器 -->
+            <!-- 地图容器 -->
             <div class="run-map-container" id="runMapContainer">
                 <div id="amapContainer" style="width:100%;height:100%;position:relative;"></div>
+                <div id="osmContainer" style="width:100%;height:100%;position:relative;display:none;"></div>
                 <div class="gps-status" id="gpsStatus">📡 GPS定位中...</div>
             </div>
+            <!-- 跑步控制选项 -->
+            <div class="run-options">
+                <label class="run-option-item">
+                    <input type="checkbox" id="autoAnnounceToggle" checked>
+                    <span>📢 每公里语音播报</span>
+                </label>
+                <label class="run-option-item">
+                    <input type="checkbox" id="musicReminderToggle">
+                    <span>🎵 音乐切换提示</span>
+                </label>
+            </div>
             <div class="run-actions">
-                <button class="btn btn-danger btn-large" onclick="stopRun()">🛑 停止跑步</button>
+                <button class="btn btn-danger btn-large" id="stopRunBtn">🛑 停止跑步</button>
             </div>
         </div>
     </div>
@@ -248,14 +346,31 @@
     <div class="modal" id="runDetailModal" style="display:none">
         <div class="modal-content detail-modal">
             <div class="detail-header">
-                <button class="btn-back" onclick="closeRunDetail()">← 返回</button>
+                <button class="btn-back" id="backFromDetail">← 返回</button>
                 <h2 id="detailTitle">跑步详情</h2>
-                <button class="btn-delete" id="deleteRunBtn" title="删除记录">🗑️</button>
+                <div class="detail-header-actions">
+                    <button class="btn-icon" id="editNoteBtn" title="编辑备注">✏️</button>
+                    <button class="btn-icon" id="deleteRunBtn" title="删除记录">🗑️</button>
+                </div>
             </div>
             <div class="detail-map" id="detailMapContainer">
                 <div id="detailAmapContainer" style="width:100%;height:100%;"></div>
+                <div id="detailOsmContainer" style="width:100%;height:100%;display:none;"></div>
+                <div class="detail-map-loading" id="detailMapLoading" style="display:none">
+                    <div class="spinner"></div>
+                    <span>地图加载中...</span>
+                </div>
             </div>
             <div class="detail-stats" id="detailStats"></div>
+            <!-- 备注编辑区 -->
+            <div class="detail-note-section" id="noteSection" style="display:none">
+                <label class="note-label">📝 跑步备注</label>
+                <textarea id="runNoteInput" class="note-input" placeholder="添加备注，记录这次跑步的感受..."></textarea>
+                <div class="note-actions">
+                    <button class="btn btn-secondary btn-sm" id="cancelNoteBtn">取消</button>
+                    <button class="btn btn-primary btn-sm" id="saveNoteBtn">保存备注</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -264,7 +379,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>⚙️ 设置</h2>
-                <button class="btn-close" onclick="closeSettings()">✕</button>
+                <button class="btn-close" id="closeSettingsBtn">✕</button>
             </div>
             <div class="setting-item">
                 <label>每日步数目标</label>
@@ -275,13 +390,36 @@
                 <input type="number" id="settingStepLength" value="70" min="40" max="120">
             </div>
             <div class="setting-item">
+                <label>地图服务</label>
+                <div class="map-provider-select">
+                    <label class="radio-label">
+                        <input type="radio" name="mapProvider" value="amap" id="mapProviderAmap">
+                        <span>🗺️ 高德地图</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="mapProvider" value="osm" id="mapProviderOsm">
+                        <span>🗺️ OpenStreetMap</span>
+                    </label>
+                </div>
+            </div>
+            <div class="setting-item" id="amapKeySection">
                 <label>高德地图 API Key</label>
                 <input type="text" id="settingAmapKey" placeholder="请输入您的高德 API Key">
                 <p class="setting-hint">申请地址: <a href="https://console.amap.com/dev/key/app" target="_blank">高德开放平台</a></p>
             </div>
+            <div class="setting-item">
+                <label>语音播报（每公里）</label>
+                <div class="toggle-row">
+                    <label class="toggle">
+                        <input type="checkbox" id="settingAutoAnnounce" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-label">开启语音提醒</span>
+                </div>
+            </div>
             <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="closeSettings()">取消</button>
-                <button class="btn btn-primary" onclick="saveSettings()">保存</button>
+                <button class="btn btn-secondary" id="cancelSettingsBtn">取消</button>
+                <button class="btn btn-primary" id="saveSettingsBtn">保存</button>
             </div>
         </div>
     </div>

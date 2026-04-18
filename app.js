@@ -1,17 +1,26 @@
 /**
- * 运动记录App - 主逻辑
+ * 运动记录App - 主逻辑 v3
  * 功能：步数统计、GPS跑步追踪（高德地图）、历史记录、统计数据、PWA自动更新
+ * 新增：语音播报、备注编辑、数据导出、加载状态
  */
 
 // ============ 配置 ============
-const STORAGE_KEY = 'exercise_data_v2';
-const SETTINGS_KEY = 'exercise_settings_v2';
+const STORAGE_KEY = 'exercise_data_v3';
+const SETTINGS_KEY = 'exercise_settings_v3';
+const LAST_RUN_KEY = 'last_run_settings';
 const AMAP_KEY_STORAGE = 'amap_api_key';
 
 const DEFAULT_SETTINGS = {
     stepTarget: 10000,
-    stepLength: 70, // cm
-    amapKey: ''
+    stepLength: 70,
+    amapKey: '',
+    autoAnnounce: true
+};
+
+const DEFAULT_LAST_RUN = {
+    autoAnnounce: true,
+    musicReminder: false,
+    lastDate: null
 };
 
 // ============ 状态 ============
@@ -33,7 +42,11 @@ let amapPolyline = null;
 let amapStartMarker = null;
 let amapEndMarker = null;
 let amapCurrentMarker = null;
-let amap跑步路径 = []; // AMap.LngLat array
+let amap跑步路径 = [];
+
+let lastAnnouncedKm = 0;
+let currentRunId = null;
+let currentEditingRunId = null;
 
 // ============ 数据存储 ============
 function getData() {
@@ -71,9 +84,41 @@ function saveSettings(settings) {
     }
 }
 
+function getLastRunSettings() {
+    try {
+        const s = localStorage.getItem(LAST_RUN_KEY);
+        return s ? { ...DEFAULT_LAST_RUN, ...JSON.parse(s) } : { ...DEFAULT_LAST_RUN };
+    } catch (e) {
+        return { ...DEFAULT_LAST_RUN };
+    }
+}
+
+function saveLastRunSettings(settings) {
+    try {
+        localStorage.setItem(LAST_RUN_KEY, JSON.stringify({
+            ...settings,
+            lastDate: new Date().toISOString()
+        }));
+    } catch (e) {
+        console.error('保存跑步设置失败:', e);
+    }
+}
+
 function getAmapKey() {
     const settings = getSettings();
     return settings.amapKey || localStorage.getItem(AMAP_KEY_STORAGE) || '';
+}
+
+// ============ Toast 通知 ============
+function showToast(message, icon = '✅', duration = 2500) {
+    const toast = document.getElementById('globalToast');
+    const msgEl = document.getElementById('toastMessage');
+    const iconEl = document.getElementById('toastIcon');
+    if (!toast) return;
+    if (msgEl) msgEl.textContent = message;
+    if (iconEl) iconEl.textContent = icon;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), duration);
 }
 
 // ============ 步数检测 ============
@@ -83,7 +128,7 @@ function startStepDetection() {
     if ('DeviceMotionEvent' in window) {
         if (typeof DeviceMotionEvent.requestPermission === 'function') {
             // iOS 13+: 需要用户授权
-            console.log('iOS设备，请点击按钮授权步数检测');
+            console.log('iOS设备，步数检测需要用户授权');
             document.addEventListener('click', requestIOSStepPermission, { once: true });
         } else {
             enableStepDetection();
@@ -98,20 +143,22 @@ async function requestIOSStepPermission() {
         const permission = await DeviceMotionEvent.requestPermission();
         if (permission === 'granted') {
             enableStepDetection();
+            showToast('步数检测已授权', '✅');
         }
     } catch (e) {
         console.warn('步数授权失败:', e);
+        showToast('步数授权失败，请在设置中开启', '⚠️');
     }
 }
 
 function enableStepDetection() {
     isStepDetecting = true;
-    window.addEventListener('devicemotion', handleDeviceMotion);
+    window.addEventListener('devicemotion', handleDeviceMotion, { passive: true });
     console.log('步数检测已启动');
 }
 
 function handleDeviceMotion(event) {
-    if (isRunning) return; // 跑步时不计步
+    if (isRunning) return;
     const acc = event.accelerationIncludingGravity;
     if (!acc) return;
 
@@ -132,11 +179,11 @@ function handleDeviceMotion(event) {
 
 // 桌面端模拟步数
 function simulateSteps() {
-    if ('ontouchstart' in window) {
-        console.log('移动设备，不运行步数模拟');
+    if ('ontouchstart' in window || 'ontouchmove' in window) {
+        // 真实移动设备不模拟
         return;
     }
-    console.log('桌面设备，运行步数模拟（每4秒增加随机步数）');
+    console.log('桌面设备，运行步数模拟');
     setInterval(() => {
         if (!isRunning) {
             const add = Math.floor(Math.random() * 8) + 2;
@@ -147,14 +194,58 @@ function simulateSteps() {
     }, 4000);
 }
 
+// ============ 语音播报 ============
+function announceDistance(km) {
+    if (!('speechSynthesis' in window)) return;
+    const settings = getSettings();
+    if (!settings.autoAnnounce) return;
+
+    const autoAnnounceToggle = document.getElementById('autoAnnounceToggle');
+    if (autoAnnounceToggle && !autoAnnounceToggle.checked) return;
+
+    // 防止重复播报
+    if (km <= lastAnnouncedKm) return;
+    lastAnnouncedKm = Math.floor(km);
+
+    // 过滤噪音（GPS跳动）
+    if (km < lastAnnouncedKm + 0.8) return;
+
+    const text = `已完成 ${Math.floor(km)} 公里，继续加油！`;
+    try {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-CN';
+        utterance.rate = 1.1;
+        utterance.pitch = 1.0;
+        speechSynthesis.cancel();
+        speechSynthesis.speak(utterance);
+    } catch (e) {
+        console.warn('语音播报失败:', e);
+    }
+}
+
+// 音乐切换提示（模拟）
+function suggestMusicSwitch() {
+    const musicToggle = document.getElementById('musicReminderToggle');
+    if (musicToggle && musicToggle.checked) {
+        showToast('🎵 建议切换到运动音乐', '🎵', 3000);
+    }
+}
+
 // ============ GPS跑步 ============
 async function startRun() {
     console.log('开始跑步被调用');
 
     if (!navigator.geolocation) {
-        alert('您的设备不支持GPS定位');
+        showToast('您的设备不支持GPS定位', '⚠️');
         return;
     }
+
+    // 恢复上次跑步设置
+    const lastRun = getLastRunSettings();
+    const autoAnnounceToggle = document.getElementById('autoAnnounceToggle');
+    const musicReminderToggle = document.getElementById('musicReminderToggle');
+    if (autoAnnounceToggle) autoAnnounceToggle.checked = lastRun.autoAnnounce;
+    if (musicReminderToggle) musicReminderToggle.checked = lastRun.musicReminder;
 
     isRunning = true;
     runStartTime = Date.now();
@@ -162,21 +253,17 @@ async function startRun() {
     runDistance = 0;
     lastPosition = null;
     amap跑步路径 = [];
+    lastAnnouncedKm = 0;
 
-    // 显示跑步弹窗
     const runModal = document.getElementById('runModal');
     if (runModal) {
         runModal.style.display = 'flex';
         document.body.classList.add('running');
     }
 
-    // 初始化高德地图
     initAmapMap();
-
-    // 开始计时
     runTimer = setInterval(updateRunTime, 1000);
 
-    // 开始GPS追踪
     runWatchId = navigator.geolocation.watchPosition(
         updateRunPosition,
         handleGeoError,
@@ -188,13 +275,12 @@ async function startRun() {
 
 function initAmapMap() {
     const key = getAmapKey();
-    if (!key || key === 'YOUR_AMAP_API_KEY_HERE') {
+    if (!key) {
         const status = document.getElementById('gpsStatus');
         if (status) status.textContent = '⚠️ 请先在设置中配置高德地图 API Key';
         return;
     }
 
-    // 检查 AMap 是否已加载
     if (typeof AMap === 'undefined') {
         console.warn('高德地图 SDK 未加载');
         const status = document.getElementById('gpsStatus');
@@ -215,11 +301,9 @@ function initAmapMap() {
             resizeEnable: true
         });
 
-        // 添加控件
         amapMap.addControl(new AMap.Scale());
         amapMap.addControl(new AMap.ToolBar({ position: 'RB' }));
 
-        // 初始化轨迹线
         amapPolyline = new AMap.Polyline({
             strokeColor: '#667eea',
             strokeWeight: 6,
@@ -248,26 +332,29 @@ function updateRunPosition(position) {
         status.classList.add('active');
     }
 
-    // 计算距离
     if (lastPosition) {
         const dist = haversineDistance(lastPosition, currentPos);
-        // 过滤GPS误差
-        if (dist < 100 && accuracy < 30) {
+        // GPS精度过滤
+        if (dist < 100 && accuracy < 50) {
             runDistance += dist;
+            // 每公里播报
+            const km = runDistance / 1000;
+            announceDistance(km);
+            // 音乐提示（每3公里）
+            if (Math.floor(km) > 0 && Math.floor(km) % 3 === 0 && Math.floor(km) !== lastAnnouncedKm) {
+                suggestMusicSwitch();
+            }
         }
     }
 
     runPath.push(currentPos);
     lastPosition = currentPos;
 
-    // 更新高德地图
     if (amapMap) {
         const lngLat = new AMap.LngLat(longitude, latitude);
         amap跑步路径.push(lngLat);
-
         amapPolyline.setPath(amap跑步路径);
 
-        // 起点标记
         if (!amapStartMarker && amap跑步路径.length === 1) {
             amapStartMarker = new AMap.Marker({
                 position: lngLat,
@@ -279,10 +366,7 @@ function updateRunPosition(position) {
             amapMap.add(amapStartMarker);
         }
 
-        // 当前位置标记
-        if (amapCurrentMarker) {
-            amapMap.remove(amapCurrentMarker);
-        }
+        if (amapCurrentMarker) amapMap.remove(amapCurrentMarker);
         amapCurrentMarker = new AMap.Marker({
             position: lngLat,
             icon: new AMap.Icon({
@@ -291,8 +375,6 @@ function updateRunPosition(position) {
             })
         });
         amapMap.add(amapCurrentMarker);
-
-        // 移动地图中心
         amapMap.setCenter(lngLat);
     }
 
@@ -342,6 +424,7 @@ function handleGeoError(error) {
     if (status) {
         const msgs = { 1: '位置权限被拒绝', 2: '无法获取位置', 3: '定位超时' };
         status.textContent = '⚠️ ' + (msgs[error.code] || '定位失败');
+        status.classList.remove('active');
     }
 }
 
@@ -349,11 +432,18 @@ function stopRun() {
     console.log('停止跑步被调用');
     if (!isRunning) return;
 
+    // 保存跑步设置
+    const autoAnnounceToggle = document.getElementById('autoAnnounceToggle');
+    const musicReminderToggle = document.getElementById('musicReminderToggle');
+    saveLastRunSettings({
+        autoAnnounce: autoAnnounceToggle ? autoAnnounceToggle.checked : true,
+        musicReminder: musicReminderToggle ? musicReminderToggle.checked : false
+    });
+
     isRunning = false;
     if (runTimer) { clearInterval(runTimer); runTimer = null; }
     if (runWatchId) { navigator.geolocation.clearWatch(runWatchId); runWatchId = null; }
 
-    // 保存跑步记录
     if (runDistance > 10) {
         const data = getData();
         const run = {
@@ -364,34 +454,33 @@ function stopRun() {
             distance: runDistance,
             duration: Math.floor((Date.now() - runStartTime) / 1000),
             path: runPath,
-            calories: Math.round(runDistance * 0.6)
+            calories: Math.round(runDistance * 0.6),
+            note: ''
         };
         data.runs.push(run);
         saveData(data);
+        currentRunId = run.id;
 
-        // 询问是否查看详情
+        const distKm = (runDistance / 1000).toFixed(2);
         setTimeout(() => {
-            if (confirm(`跑步完成！距离 ${(runDistance / 1000).toFixed(2)} km，继续查看详情？`)) {
+            showToast(`跑步完成！${distKm} 公里 🎉`, '🏃');
+            if (confirm(`跑步完成！距离 ${distKm} km，继续查看详情？`)) {
                 showRunDetail(run.id);
             }
         }, 300);
     }
 
-    // 清理地图
     cleanupAmap();
 
-    // 关闭弹窗
     const runModal = document.getElementById('runModal');
     if (runModal) runModal.style.display = 'none';
     document.body.classList.remove('running');
 
-    // 重置
     runPath = [];
     runDistance = 0;
     lastPosition = null;
     amap跑步路径 = [];
 
-    // 刷新UI
     updateTodayHistory();
     updateWeekStatsPreview();
 }
@@ -409,19 +498,29 @@ function cleanupAmap() {
 
 // ============ 历史记录 ============
 function showHistory() {
-    const data = getData();
-    const runs = [...data.runs].sort((a, b) => new Date(b.time) - new Date(a.time));
+    const loadingEl = document.getElementById('historyLoading');
+    if (loadingEl) loadingEl.style.display = 'flex';
 
-    // 填充月份筛选器
-    const monthFilter = document.getElementById('historyMonthFilter');
-    if (monthFilter) {
-        const months = [...new Set(runs.map(r => r.date.substring(0, 7)))].sort().reverse();
-        monthFilter.innerHTML = '<option value="">全部月份</option>' +
-            months.map(m => `<option value="${m}">${m}</option>`).join('');
-        monthFilter.onchange = () => filterHistory(monthFilter.value);
-    }
+    setTimeout(() => {
+        const data = getData();
+        const runs = [...data.runs].sort((a, b) => new Date(b.time) - new Date(a.time));
 
-    renderHistoryList(runs);
+        const monthFilter = document.getElementById('historyMonthFilter');
+        if (monthFilter) {
+            const months = [...new Set(runs.map(r => r.date.substring(0, 7)))].sort().reverse();
+            const currentVal = monthFilter.value;
+            monthFilter.innerHTML = '<option value="">全部月份</option>' +
+                months.map(m => {
+                    const [y, mo] = m.split('-');
+                    return `<option value="${m}">${y}年${parseInt(mo)}月</option>`;
+                }).join('');
+            monthFilter.value = currentVal;
+            monthFilter.onchange = () => filterHistory(monthFilter.value);
+        }
+
+        renderHistoryList(runs);
+        if (loadingEl) loadingEl.style.display = 'none';
+    }, 100);
 }
 
 function filterHistory(monthStr) {
@@ -436,11 +535,10 @@ function renderHistoryList(runs) {
     if (!container) return;
 
     if (runs.length === 0) {
-        container.innerHTML = '<p class="empty-state">暂无历史记录</p>';
+        container.innerHTML = '<div class="empty-state">暂无历史记录<br><small style="color:#a0aec0">开始你的第一次跑步吧！</small></div>';
         return;
     }
 
-    // 按月份分组
     const groups = {};
     runs.forEach(run => {
         const month = run.date.substring(0, 7);
@@ -453,29 +551,51 @@ function renderHistoryList(runs) {
 
     container.innerHTML = sortedMonths.map(month => {
         const [y, m] = month.split('-');
+        const monthTotal = groups[month].reduce((sum, r) => sum + r.distance / 1000, 0);
         const runsHtml = groups[month].map(run => {
             const d = new Date(run.time);
             const dateStr = d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
             const timeStr = d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
             const distKm = (run.distance / 1000).toFixed(2);
             const pace = formatPace(run.distance, run.duration);
+            const durMin = Math.floor(run.duration / 60);
+            const durSec = run.duration % 60;
+            const durationStr = `${durMin}分${durSec}秒`;
+            const calories = run.calories || Math.round(run.distance * 0.6);
+            const noteIcon = run.note ? '💬' : '';
+
             return `
-                <div class="history-item" onclick="showRunDetail(${run.id})">
-                    <span class="history-icon">🏃</span>
-                    <div class="history-info">
-                        <div class="history-title">${distKm} 公里跑步</div>
-                        <div class="history-detail">${formatDuration(run.duration)} · 配速 ${pace}/km</div>
+                <div class="history-item" onclick="showRunDetail(${run.id})" touchable>
+                    <div class="history-item-left">
+                        <div class="history-date-badge">${d.getDate()}<span>日</span></div>
                     </div>
-                    <div>
-                        <div class="history-distance">${distKm}</div>
-                        <div class="history-time">${dateStr} ${timeStr}</div>
+                    <div class="history-item-content">
+                        <div class="history-item-header">
+                            <span class="history-title">${distKm} 公里跑步 ${noteIcon}</span>
+                            <span class="history-pace">⏱️ ${pace}/km</span>
+                        </div>
+                        <div class="history-item-stats">
+                            <span>🕐 ${timeStr}</span>
+                            <span>⏱️ ${durationStr}</span>
+                            <span>🔥 ${calories}千卡</span>
+                        </div>
+                        ${run.note ? `<div class="history-note-preview">💬 ${run.note.substring(0, 30)}${run.note.length > 30 ? '...' : ''}</div>` : ''}
                     </div>
+                    <div class="history-item-arrow">›</div>
                 </div>
             `;
         }).join('');
 
         const monthLabel = `${y}年 ${monthNames[parseInt(m) - 1]}`;
-        return `<div class="history-group"><div class="history-group-title">${monthLabel}</div>${runsHtml}</div>`;
+        return `
+            <div class="history-group">
+                <div class="history-group-header">
+                    <span class="history-group-title">${monthLabel}</span>
+                    <span class="history-group-total">${monthTotal.toFixed(1)} km</span>
+                </div>
+                <div class="history-group-items">${runsHtml}</div>
+            </div>
+        `;
     }).join('');
 }
 
@@ -485,9 +605,14 @@ function showRunDetail(runId) {
     const run = data.runs.find(r => r.id === runId);
     if (!run) return;
 
+    currentEditingRunId = runId;
+
     const modal = document.getElementById('runDetailModal');
     const titleEl = document.getElementById('detailTitle');
     const statsEl = document.getElementById('detailStats');
+    const noteSection = document.getElementById('noteSection');
+    const noteInput = document.getElementById('runNoteInput');
+    const mapLoading = document.getElementById('detailMapLoading');
 
     if (titleEl) {
         const d = new Date(run.time);
@@ -498,25 +623,54 @@ function showRunDetail(runId) {
         const distKm = (run.distance / 1000).toFixed(2);
         const durMin = Math.floor(run.duration / 60);
         const durSec = run.duration % 60;
+        const durFormatted = `${String(durMin).padStart(2,'0')}:${String(durSec).padStart(2,'0')}`;
         const pace = formatPace(run.distance, run.duration);
+        const calories = run.calories || Math.round(run.distance * 0.6);
+        const avgSpeed = run.duration > 0 ? ((run.distance / 1000) / (run.duration / 3600)).toFixed(1) : '0.0';
+
         statsEl.innerHTML = `
-            <div class="detail-stat-item">
-                <span class="val">${distKm}</span>
-                <span class="label">公里</span>
+            <div class="detail-stat-card primary">
+                <span class="detail-stat-icon">📍</span>
+                <span class="detail-stat-val">${distKm}</span>
+                <span class="detail-stat-label">公里</span>
             </div>
-            <div class="detail-stat-item">
-                <span class="val">${durMin}:${String(durSec).padStart(2,'0')}</span>
-                <span class="label">时长</span>
+            <div class="detail-stat-card">
+                <span class="detail-stat-icon">⏱️</span>
+                <span class="detail-stat-val">${durFormatted}</span>
+                <span class="detail-stat-label">时长</span>
             </div>
-            <div class="detail-stat-item">
-                <span class="val">${pace}</span>
-                <span class="label">配速 /km</span>
+            <div class="detail-stat-card">
+                <span class="detail-stat-icon">⚡</span>
+                <span class="detail-stat-val">${pace}</span>
+                <span class="detail-stat-label">配速 /km</span>
             </div>
-            <div class="detail-stat-item">
-                <span class="val">${run.calories || Math.round(run.distance * 0.6)}</span>
-                <span class="label">千卡</span>
+            <div class="detail-stat-card">
+                <span class="detail-stat-icon">🚀</span>
+                <span class="detail-stat-val">${avgSpeed}</span>
+                <span class="detail-stat-label">均速 km/h</span>
+            </div>
+            <div class="detail-stat-card">
+                <span class="detail-stat-icon">🔥</span>
+                <span class="detail-stat-val">${calories}</span>
+                <span class="detail-stat-label">千卡</span>
+            </div>
+            <div class="detail-stat-card">
+                <span class="detail-stat-icon">👣</span>
+                <span class="detail-stat-val">${Math.round(run.distance * 1.3)}</span>
+                <span class="detail-stat-label">步数</span>
             </div>
         `;
+    }
+
+    // 显示备注
+    if (noteSection) {
+        if (run.note) {
+            noteSection.style.display = 'block';
+            if (noteInput) noteInput.value = run.note;
+        } else {
+            noteSection.style.display = 'none';
+            if (noteInput) noteInput.value = '';
+        }
     }
 
     if (modal) modal.style.display = 'flex';
@@ -525,27 +679,70 @@ function showRunDetail(runId) {
     const delBtn = document.getElementById('deleteRunBtn');
     if (delBtn) {
         delBtn.onclick = () => {
-            if (confirm('确定删除这条跑步记录？')) {
+            if (confirm('确定删除这条跑步记录？此操作不可恢复。')) {
                 deleteRun(runId);
                 closeRunDetail();
+                showToast('记录已删除', '🗑️');
             }
         };
     }
 
-    // 延迟初始化地图
-    setTimeout(() => initDetailMap(run), 100);
+    // 编辑备注按钮
+    const editBtn = document.getElementById('editNoteBtn');
+    if (editBtn) {
+        editBtn.onclick = () => {
+            const noteSec = document.getElementById('noteSection');
+            const noteIn = document.getElementById('runNoteInput');
+            if (noteSec && noteIn) {
+                noteSec.style.display = 'block';
+                noteIn.focus();
+            }
+        };
+    }
+
+    // 保存备注
+    const saveNoteBtn = document.getElementById('saveNoteBtn');
+    if (saveNoteBtn) {
+        saveNoteBtn.onclick = () => {
+            const noteVal = document.getElementById('runNoteInput').value.trim();
+            saveRunNote(runId, noteVal);
+            const noteSec = document.getElementById('noteSection');
+            if (noteSec) noteSec.style.display = noteVal ? 'block' : 'none';
+            showToast('备注已保存', '💾');
+        };
+    }
+
+    // 取消备注
+    const cancelNoteBtn = document.getElementById('cancelNoteBtn');
+    if (cancelNoteBtn) {
+        cancelNoteBtn.onclick = () => {
+            const noteSec = document.getElementById('noteSection');
+            const data2 = getData();
+            const run2 = data2.runs.find(r => r.id === runId);
+            if (noteSec) noteSec.style.display = run2 && run2.note ? 'block' : 'none';
+            if (noteSec && run2 && run2.note) {
+                document.getElementById('runNoteInput').value = run2.note;
+            }
+        };
+    }
+
+    // 加载地图
+    if (mapLoading) mapLoading.style.display = 'flex';
+    setTimeout(() => {
+        initDetailMap(run);
+        if (mapLoading) mapLoading.style.display = 'none';
+    }, 100);
 }
 
 function initDetailMap(run) {
     const key = getAmapKey();
-    if (!key || key === 'YOUR_AMAP_API_KEY_HERE') return;
+    if (!key) return;
     if (typeof AMap === 'undefined') return;
     if (!run.path || run.path.length < 2) return;
 
     const container = document.getElementById('detailAmapContainer');
     if (!container) return;
 
-    // 计算中心点
     const lats = run.path.map(p => p.lat);
     const lngs = run.path.map(p => p.lng);
     const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
@@ -560,7 +757,6 @@ function initDetailMap(run) {
 
         const pathLngLat = run.path.map(p => new AMap.LngLat(p.lng, p.lat));
 
-        // 轨迹线
         const polyline = new AMap.Polyline({
             strokeColor: '#667eea',
             strokeWeight: 6,
@@ -569,7 +765,6 @@ function initDetailMap(run) {
         polyline.setPath(pathLngLat);
         detailMap.add(polyline);
 
-        // 起点
         detailMap.add(new AMap.Marker({
             position: pathLngLat[0],
             icon: new AMap.Icon({
@@ -578,7 +773,6 @@ function initDetailMap(run) {
             })
         }));
 
-        // 终点
         detailMap.add(new AMap.Marker({
             position: pathLngLat[pathLngLat.length - 1],
             icon: new AMap.Icon({
@@ -596,9 +790,22 @@ function initDetailMap(run) {
 function closeRunDetail() {
     const modal = document.getElementById('runDetailModal');
     if (modal) modal.style.display = 'none';
-    // 清理详情地图
+    currentEditingRunId = null;
     const container = document.getElementById('detailAmapContainer');
     if (container) container.innerHTML = '';
+}
+
+function saveRunNote(runId, note) {
+    const data = getData();
+    const run = data.runs.find(r => r.id === runId);
+    if (run) {
+        run.note = note;
+        saveData(data);
+        // 更新历史列表中的显示
+        if (document.getElementById('pageHistory').classList.contains('active')) {
+            showHistory();
+        }
+    }
 }
 
 function deleteRun(runId) {
@@ -610,6 +817,28 @@ function deleteRun(runId) {
     updateWeekStatsPreview();
 }
 
+// ============ 数据导出 ============
+function exportData() {
+    const data = getData();
+    const exportObj = {
+        exportDate: new Date().toISOString(),
+        version: 'exercise-tracker-v3',
+        records: data.records,
+        runs: data.runs,
+        settings: getSettings()
+    };
+
+    const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const today = new Date().toISOString().split('T')[0];
+    a.download = `运动记录_${today}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('数据已导出', '📤');
+}
+
 // ============ 统计页面 ============
 function showStats() {
     updateStatsPage();
@@ -619,13 +848,11 @@ function updateStatsPage() {
     const data = getData();
     const runs = data.runs;
 
-    // 总览数据
     const totalRuns = runs.length;
     const totalDistance = runs.reduce((s, r) => s + r.distance, 0) / 1000;
     const totalDuration = runs.reduce((s, r) => s + r.duration, 0) / 60;
     const totalCalories = runs.reduce((s, r) => s + (r.calories || Math.round(r.distance * 0.6)), 0);
 
-    // 平均配速
     let avgPace = '--:--';
     if (totalDistance > 0) {
         const totalMin = totalDuration;
@@ -633,20 +860,20 @@ function updateStatsPage() {
         avgPace = `${Math.floor(paceVal)}:${String(Math.round((paceVal - Math.floor(paceVal)) * 60)).padStart(2, '0')}`;
     }
 
-    document.getElementById('totalRuns').textContent = totalRuns;
-    document.getElementById('totalDistance').textContent = totalDistance.toFixed(1);
-    document.getElementById('totalDuration').textContent = Math.round(totalDuration);
-    document.getElementById('avgPace').textContent = avgPace;
-    document.getElementById('totalCalories').textContent = totalCalories;
-    document.getElementById('totalSteps').textContent = Math.round(totalDistance * 1300).toLocaleString();
+    const setIf = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+    };
 
-    // 周柱状图
+    setIf('totalRuns', totalRuns);
+    setIf('totalDistance', totalDistance.toFixed(1));
+    setIf('totalDuration', Math.round(totalDuration));
+    setIf('avgPace', avgPace);
+    setIf('totalCalories', totalCalories);
+    setIf('totalSteps', Math.round(totalDistance * 1300).toLocaleString());
+
     drawWeekChart(runs);
-
-    // 月度日历
     drawMonthGrid(runs);
-
-    // 月度趋势
     drawMonthTrend(runs);
 }
 
@@ -684,7 +911,6 @@ function drawWeekChart(runs) {
     const chartH = h - 40;
     const colors = weekData.map(d => d.isToday ? '#48bb78' : '#667eea');
 
-    // Y轴
     ctx.strokeStyle = '#e2e8f0';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
@@ -694,17 +920,16 @@ function drawWeekChart(runs) {
         ctx.lineTo(w - 10, y);
         ctx.stroke();
         ctx.fillStyle = '#a0aec0';
-        ctx.font = '10px -apple-system';
-        ctx.fillText((maxDist * (4 - i) / 4).toFixed(1), 0, y + 3);
+        ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText((maxDist * (4 - i) / 4).toFixed(1) + 'km', 28, y + 3);
     }
 
-    // 柱状图
     weekData.forEach((d, i) => {
         const barH = maxDist > 0 ? (d.dist / maxDist) * (chartH - 20) : 0;
         const x = 40 + i * barWidth;
         const y = 10 + chartH - barH;
 
-        // 渐变
         const gradient = ctx.createLinearGradient(x, y, x, 10 + chartH);
         gradient.addColorStop(0, colors[i]);
         gradient.addColorStop(1, i === weekData.findIndex(dd => dd.isToday) ? '#68d391' : '#a3bffa');
@@ -714,17 +939,15 @@ function drawWeekChart(runs) {
         ctx.roundRect(x + 2, y, barWidth - 4, barH, 4);
         ctx.fill();
 
-        // 数值
         if (d.dist > 0) {
             ctx.fillStyle = '#2d3748';
-            ctx.font = 'bold 10px -apple-system';
+            ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
             ctx.textAlign = 'center';
             ctx.fillText(d.dist.toFixed(1), x + barWidth / 2, y - 4);
         }
 
-        // 标签
         ctx.fillStyle = d.isToday ? '#48bb78' : '#718096';
-        ctx.font = '11px -apple-system';
+        ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(d.day, x + barWidth / 2, 10 + chartH + 16);
     });
@@ -743,7 +966,6 @@ function drawMonthGrid(runs) {
     const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
     const todayStr = today.toISOString().split('T')[0];
 
-    // 收集本月有跑步的日期
     const data = getData();
     const runDates = new Set(data.runs
         .filter(r => r.date.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`))
@@ -751,12 +973,10 @@ function drawMonthGrid(runs) {
 
     let html = dayNames.map(d => `<div class="month-day-header">${d}</div>`).join('');
 
-    // 空白格子
     for (let i = 0; i < firstDay; i++) {
         html += '<div class="month-day empty"></div>';
     }
 
-    // 日期格子
     for (let d = 1; d <= daysInMonth; d++) {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         let cls = 'month-day';
@@ -779,7 +999,6 @@ function drawMonthTrend(runs) {
     const w = rect.width;
     const h = 160;
 
-    // 最近6个月数据
     const today = new Date();
     const months = [];
     for (let i = 5; i >= 0; i--) {
@@ -798,7 +1017,6 @@ function drawMonthTrend(runs) {
     const chartH = h - 40;
     const barW = (w - 40) / 6;
 
-    // Y轴线
     ctx.strokeStyle = '#e2e8f0';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 3; i++) {
@@ -809,7 +1027,6 @@ function drawMonthTrend(runs) {
         ctx.stroke();
     }
 
-    // 柱状图
     months.forEach((m, i) => {
         const barH = (m.dist / maxDist) * (chartH - 10);
         const x = 35 + i * barW;
@@ -826,13 +1043,13 @@ function drawMonthTrend(runs) {
 
         if (m.dist > 0) {
             ctx.fillStyle = '#2d3748';
-            ctx.font = 'bold 10px -apple-system';
+            ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
             ctx.textAlign = 'center';
             ctx.fillText(m.dist.toFixed(1), x + (barW - 8) / 2, y - 4);
         }
 
         ctx.fillStyle = '#718096';
-        ctx.font = '11px -apple-system';
+        ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(m.label, x + (barW - 8) / 2, 10 + chartH + 14);
     });
@@ -853,6 +1070,15 @@ function updateStepDisplay() {
     if (el('calories')) el('calories').textContent = Math.round(steps * 0.04);
     if (el('distance')) el('distance').textContent = (steps * settings.stepLength / 100 / 1000).toFixed(1);
     if (el('activeTime')) el('activeTime').textContent = Math.round(steps * 0.5 / 60);
+
+    // 步数圆环进度
+    const ringEl = document.getElementById('stepRingProgress');
+    if (ringEl) {
+        const circumference = 2 * Math.PI * 58; // r=58
+        const offset = circumference - (percent / 100) * circumference;
+        ringEl.style.strokeDasharray = `${circumference}`;
+        ringEl.style.strokeDashoffset = offset;
+    }
 }
 
 function updateTodayHistory() {
@@ -864,7 +1090,7 @@ function updateTodayHistory() {
     if (!container) return;
 
     if (todayRuns.length === 0) {
-        container.innerHTML = '<p class="empty-state">暂无记录，开始你的第一次运动吧！</p>';
+        container.innerHTML = '<div class="empty-state">暂无记录，开始你的第一次运动吧！<br><small style="color:#a0aec0">点击下方"开始跑步"按钮</small></div>';
         return;
     }
 
@@ -873,11 +1099,12 @@ function updateTodayHistory() {
         const timeStr = d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
         const distKm = (run.distance / 1000).toFixed(2);
         const pace = formatPace(run.distance, run.duration);
+        const noteIcon = run.note ? '💬' : '';
         return `
-            <div class="history-item" onclick="showRunDetail(${run.id})">
+            <div class="history-item" onclick="showRunDetail(${run.id})" touchable>
                 <span class="history-icon">🏃</span>
                 <div class="history-info">
-                    <div class="history-title">跑步 ${distKm} 公里</div>
+                    <div class="history-title">跑步 ${distKm} 公里 ${noteIcon}</div>
                     <div class="history-detail">${formatDuration(run.duration)} · 配速 ${pace}/km</div>
                 </div>
                 <span class="history-time">${timeStr}</span>
@@ -935,9 +1162,14 @@ function updateWeekStatsPreview() {
     }).length;
     const weekTotalDist = weekData.reduce((s, d) => s + d.dist, 0);
 
-    if (document.getElementById('weekSteps')) document.getElementById('weekSteps').textContent = (weekTotalSteps / 1000).toFixed(1) + 'k';
-    if (document.getElementById('weekRuns')) document.getElementById('weekRuns').textContent = weekTotalRuns;
-    if (document.getElementById('weekDistance')) document.getElementById('weekDistance').textContent = weekTotalDist.toFixed(1);
+    const setIf = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+    };
+
+    setIf('weekSteps', weekTotalSteps > 0 ? (weekTotalSteps / 1000).toFixed(1) + 'k' : '0');
+    setIf('weekRuns', weekTotalRuns);
+    setIf('weekDistance', weekTotalDist.toFixed(1));
 }
 
 function formatDuration(seconds) {
@@ -960,11 +1192,13 @@ function openSettings() {
     const stepTargetEl = document.getElementById('settingStepTarget');
     const stepLengthEl = document.getElementById('settingStepLength');
     const amapKeyEl = document.getElementById('settingAmapKey');
+    const autoAnnounceEl = document.getElementById('settingAutoAnnounce');
     const modal = document.getElementById('settingsModal');
 
     if (stepTargetEl) stepTargetEl.value = settings.stepTarget;
     if (stepLengthEl) stepLengthEl.value = settings.stepLength;
     if (amapKeyEl) amapKeyEl.value = settings.amapKey || '';
+    if (autoAnnounceEl) autoAnnounceEl.checked = settings.autoAnnounce !== false;
     if (modal) modal.style.display = 'flex';
 }
 
@@ -973,29 +1207,30 @@ function closeSettings() {
     if (modal) modal.style.display = 'none';
 }
 
-function saveSettings() {
+function saveSettingsHandler() {
     const newSettings = {
         stepTarget: parseInt(document.getElementById('settingStepTarget').value) || 10000,
         stepLength: parseInt(document.getElementById('settingStepLength').value) || 70,
-        amapKey: (document.getElementById('settingAmapKey').value || '').trim()
+        amapKey: (document.getElementById('settingAmapKey').value || '').trim(),
+        autoAnnounce: document.getElementById('settingAutoAnnounce').checked
     };
     saveSettings(newSettings);
     updateStepDisplay();
     closeSettings();
-    alert('设置已保存！刷新页面后高德地图将使用新配置。');
+    showToast('设置已保存', '💾');
 }
 
 // ============ 页面导航 ============
 function navigateTo(pageName) {
+    const pageEl = document.getElementById('page' + pageName.charAt(0).toUpperCase() + pageName.slice(1));
+    if (!pageEl) return;
+
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
-    const page = document.getElementById('page' + pageName.charAt(0).toUpperCase() + pageName.slice(1));
-    if (page) {
-        page.classList.add('active');
-        const navBtn = document.querySelector(`.nav-item[data-page="page${pageName.charAt(0).toUpperCase() + pageName.slice(1)}"]`);
-        if (navBtn) navBtn.classList.add('active');
-    }
+    pageEl.classList.add('active');
+    const navBtn = document.querySelector(`.nav-item[data-page="page${pageName.charAt(0).toUpperCase() + pageName.slice(1)}"]`);
+    if (navBtn) navBtn.classList.add('active');
 
     if (pageName === 'history') showHistory();
     if (pageName === 'stats') showStats();
@@ -1018,7 +1253,7 @@ function setupUpdatePrompt() {
 
         navigator.serviceWorker.addEventListener('message', event => {
             if (event.data && event.data.type === 'SKIP_WAITING') {
-                newServiceWorker.postMessage({ type: 'SKIP_WAITING' });
+                newServiceWorker && newServiceWorker.postMessage({ type: 'SKIP_WAITING' });
             }
         });
     }
@@ -1039,7 +1274,6 @@ function showUpdatePrompt() {
 function init() {
     console.log('App初始化开始');
 
-    // 设置日期
     const now = new Date();
     const dateEl = document.getElementById('currentDate');
     if (dateEl) {
@@ -1069,10 +1303,10 @@ function init() {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js')
             .then(reg => {
-                console.log('SW registered, version:', reg.active ? 'active' : 'waiting');
+                console.log('SW registered');
                 reg.addEventListener('updatefound', () => {
                     newServiceWorker = reg.installing;
-                    console.log('New SW found, waiting...');
+                    console.log('New SW found');
                 });
                 if (reg.waiting) {
                     newServiceWorker = reg.waiting;
@@ -1083,7 +1317,7 @@ function init() {
             .catch(err => console.warn('SW registration failed:', err));
     }
 
-    // 绑定按钮
+    // 绑定按钮事件
     bindButtonEvents();
 
     console.log('🏃 运动记录App已初始化完成');
@@ -1094,14 +1328,45 @@ function bindButtonEvents() {
     const startBtn = document.getElementById('startRunBtn');
     if (startBtn) startBtn.addEventListener('click', startRun);
 
+    // 停止跑步
+    const stopBtn = document.getElementById('stopRunBtn');
+    if (stopBtn) stopBtn.addEventListener('click', stopRun);
+
+    // 关闭跑步弹窗
+    const closeRunBtn = document.getElementById('closeRunBtn');
+    if (closeRunBtn) {
+        closeRunBtn.addEventListener('click', () => {
+            if (confirm('确定要退出跑步吗？')) {
+                stopRun();
+            }
+        });
+    }
+
     // 设置
     const settingsBtn = document.getElementById('settingsBtn');
     if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
+
+    const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+    if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', closeSettings);
+
+    const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
+    if (cancelSettingsBtn) cancelSettingsBtn.addEventListener('click', closeSettings);
+
+    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+    if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', saveSettingsHandler);
+
+    // 返回详情
+    const backFromDetail = document.getElementById('backFromDetail');
+    if (backFromDetail) backFromDetail.addEventListener('click', closeRunDetail);
 
     // 底部导航
     document.querySelectorAll('.nav-item').forEach(btn => {
         btn.addEventListener('click', () => navigateTo(btn.dataset.page.replace('page', '').toLowerCase()));
     });
+
+    // 导出数据
+    const exportBtn = document.getElementById('exportDataBtn');
+    if (exportBtn) exportBtn.addEventListener('click', exportData);
 
     // 模态框点击背景关闭
     ['runModal', 'settingsModal', 'runDetailModal'].forEach(id => {
@@ -1109,15 +1374,34 @@ function bindButtonEvents() {
         if (modal) {
             modal.addEventListener('click', e => {
                 if (e.target === modal) {
-                    if (id === 'runModal' && isRunning) return; // 跑步中不关闭
+                    if (id === 'runModal' && isRunning) return;
                     modal.style.display = 'none';
                 }
             });
         }
     });
+
+    // iOS Safari 安全区域
+    if (navigator.userAgent.match(/(iPhone|iPad)/i)) {
+        document.body.style.paddingBottom = 'env(safe-area-inset-bottom, 0px)';
+    }
 }
 
 // 页面离开保存步数
+window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+        const data = getData();
+        const today = new Date().toISOString().split('T')[0];
+        const todayRecord = data.records.find(r => r.date === today);
+        if (todayRecord) {
+            todayRecord.steps = stepCount;
+        } else {
+            data.records.push({ date: today, steps: stepCount });
+        }
+        saveData(data);
+    }
+});
+
 window.addEventListener('beforeunload', () => {
     const data = getData();
     const today = new Date().toISOString().split('T')[0];
