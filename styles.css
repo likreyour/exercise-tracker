@@ -715,12 +715,20 @@ body {
 }
 
 .week-bar-label {
-    font-size: 11px;
+    font-size: 10px;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--gray);
 }
 
 .week-bar-value {
-    font-size: 10px;
+    font-size: 9px;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--dark);
     font-weight: 600;
 }
@@ -1278,6 +1286,7 @@ body.running .step-circle {
 .chart-container {
     position: relative;
     height: 180px;
+    overflow: hidden;
 }
 
 .chart-legend {
@@ -1308,6 +1317,7 @@ body.running .step-circle {
     grid-template-columns: repeat(7, 1fr);
     gap: 6px;
     text-align: center;
+    overflow: hidden;
 }
 
 .month-day-header {
@@ -1315,6 +1325,17 @@ body.running .step-circle {
     color: var(--gray);
     font-weight: 600;
     padding: 4px 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.day-label {
+    font-size: 12px;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .month-day {

@@ -978,6 +978,7 @@ function drawMonthGrid(runs) {
     }
 
     for (let d = 1; d <= daysInMonth; d++) {
+        if (d < 1 || d > 31) continue; // safeguard: skip invalid day numbers
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         let cls = 'month-day';
         if (runDates.has(dateStr)) cls += ' has-run';
