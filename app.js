@@ -197,14 +197,31 @@ function handleDeviceMotion(event) {
 // 桌面端模拟步数
 function simulateSteps() {
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    if (isMobile) return;
+    if (isMobile) {
+        console.log('移动设备，不进行步数模拟');
+        return;
+    }
     console.log('桌面设备，运行步数模拟');
+    
+    // 立即执行一次，让用户立刻看到效果
+    setTimeout(() => {
+        if (!isRunning && stepCount === 0) {
+            const add = Math.floor(Math.random() * 20) + 10; // 初始给10-30步
+            stepCount += add;
+            simulatedSteps += add;
+            updateStepDisplay();
+            console.log('初始步数模拟:', add);
+        }
+    }, 1000);
+    
+    // 定期模拟
     setInterval(() => {
         if (!isRunning) {
             const add = Math.floor(Math.random() * 8) + 2;
             stepCount += add;
             simulatedSteps += add;
             updateStepDisplay();
+            console.log('步数增加:', add, '总计:', stepCount);
         }
     }, 4000);
 }
@@ -1404,9 +1421,15 @@ function init() {
     const now = new Date();
     const dateEl = document.getElementById('currentDate');
     if (dateEl) {
+        // 强制使用中文格式，防止系统语言影响
         dateEl.textContent = now.toLocaleDateString('zh-CN', {
-            year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric', 
+            weekday: 'long',
+            locale: 'zh-CN'
         });
+        console.log('当前日期:', dateEl.textContent);
     }
 
     // 恢复今日步数

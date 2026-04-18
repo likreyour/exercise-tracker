@@ -3,7 +3,7 @@
  * 功能：离线缓存 + PWA自动更新提示 + 更好的缓存策略
  */
 
-const CACHE_NAME = 'exercise-tracker-v4';
+const CACHE_NAME = 'exercise-tracker-v5';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
