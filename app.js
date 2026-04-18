@@ -16,24 +16,42 @@ const DEFAULT_SETTINGS = {
 
 // 获取数据
 function getData() {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : { records: [], runs: [] };
+    try {
+        const data = localStorage.getItem(STORAGE_KEY);
+        return data ? JSON.parse(data) : { records: [], runs: [] };
+    } catch (e) {
+        console.error('获取数据失败:', e);
+        return { records: [], runs: [] };
+    }
 }
 
 // 保存数据
 function saveData(data) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+        console.error('保存数据失败:', e);
+    }
 }
 
 // 获取设置
 function getSettings() {
-    const settings = localStorage.getItem(SETTINGS_KEY);
-    return settings ? { ...DEFAULT_SETTINGS, ...JSON.parse(settings) } : DEFAULT_SETTINGS;
+    try {
+        const settings = localStorage.getItem(SETTINGS_KEY);
+        return settings ? { ...DEFAULT_SETTINGS, ...JSON.parse(settings) } : DEFAULT_SETTINGS;
+    } catch (e) {
+        console.error('获取设置失败:', e);
+        return DEFAULT_SETTINGS;
+    }
 }
 
 // 保存设置
 function saveSettings(settings) {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    } catch (e) {
+        console.error('保存设置失败:', e);
+    }
 }
 
 // ============ 步数计数 ============
@@ -48,22 +66,20 @@ function startStepDetection() {
     if ('DeviceMotionEvent' in window) {
         // iOS 13+ 需要请求权限
         if (typeof DeviceMotionEvent.requestPermission === 'function') {
-            DeviceMotionEvent.requestPermission()
-                .then(response => {
-                    if (response === 'granted') {
-                        enableStepDetection();
-                    }
-                })
-                .catch(console.error);
+            // iOS 13+ 需要用户触发，这里用按钮点击触发
+            console.log('iOS设备，需要用户授权步数检测');
         } else {
             enableStepDetection();
         }
+    } else {
+        console.log('设备不支持步数检测');
     }
 }
 
 function enableStepDetection() {
     isStepDetecting = true;
     window.addEventListener('devicemotion', handleDeviceMotion);
+    console.log('步数检测已启动');
 }
 
 function handleDeviceMotion(event) {
@@ -96,6 +112,8 @@ let lastPosition = null;
 let runTimer = null;
 
 async function startRun() {
+    console.log('开始跑步被调用');
+    
     if (!navigator.geolocation) {
         alert('您的设备不支持GPS定位');
         return;
@@ -108,8 +126,11 @@ async function startRun() {
     lastPosition = null;
     
     // 显示跑步弹窗
-    document.getElementById('runModal').style.display = 'flex';
-    document.body.classList.add('running');
+    const runModal = document.getElementById('runModal');
+    if (runModal) {
+        runModal.style.display = 'flex';
+        document.body.classList.add('running');
+    }
     
     // 开始计时
     runTimer = setInterval(updateRunTime, 1000);
@@ -120,6 +141,8 @@ async function startRun() {
         handleGeoError,
         { enableHighAccuracy: true, maximumAge: 1000 }
     );
+    
+    console.log('跑步模式已启动');
 }
 
 function updateRunPosition(position) {
@@ -127,7 +150,10 @@ function updateRunPosition(position) {
     const currentPos = { lat: latitude, lng: longitude, time: Date.now() };
     
     // 绘制地图占位
-    document.getElementById('mapPlaceholder').style.display = 'none';
+    const mapPlaceholder = document.getElementById('mapPlaceholder');
+    if (mapPlaceholder) {
+        mapPlaceholder.style.display = 'none';
+    }
     
     // 计算距离
     if (lastPosition) {
@@ -161,8 +187,11 @@ function updateRunTime() {
     const elapsed = Math.floor((Date.now() - runStartTime) / 1000);
     const minutes = Math.floor(elapsed / 60);
     const seconds = elapsed % 60;
-    document.getElementById('runTime').textContent = 
-        `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    const runTimeEl = document.getElementById('runTime');
+    if (runTimeEl) {
+        runTimeEl.textContent = 
+            `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
 }
 
 function updateRunStats() {
@@ -171,9 +200,13 @@ function updateRunStats() {
     const pace = elapsed > 0 ? (elapsed / (runDistance / 1000)).toFixed(2) : '0.00';
     const speed = elapsed > 0 ? ((runDistance / 1000) / elapsed * 60).toFixed(1) : '0.0';
     
-    document.getElementById('runDistance').textContent = distance;
-    document.getElementById('runPace').textContent = pace.replace('.', ':');
-    document.getElementById('runSpeed').textContent = speed;
+    const runDistanceEl = document.getElementById('runDistance');
+    const runPaceEl = document.getElementById('runPace');
+    const runSpeedEl = document.getElementById('runSpeed');
+    
+    if (runDistanceEl) runDistanceEl.textContent = distance;
+    if (runPaceEl) runPaceEl.textContent = pace.replace('.', ':');
+    if (runSpeedEl) runSpeedEl.textContent = speed;
 }
 
 function drawTrack() {
@@ -238,11 +271,12 @@ function handleGeoError(error) {
 }
 
 function stopRun() {
+    console.log('停止跑步被调用');
     if (!isRunning) return;
     
     isRunning = false;
-    clearInterval(runTimer);
-    navigator.geolocation.clearWatch(runWatchId);
+    if (runTimer) clearInterval(runTimer);
+    if (runWatchId) navigator.geolocation.clearWatch(runWatchId);
     
     // 保存跑步记录
     if (runDistance > 10) { // 只保存超过10米的跑步
@@ -260,7 +294,10 @@ function stopRun() {
     }
     
     // 关闭弹窗
-    document.getElementById('runModal').style.display = 'none';
+    const runModal = document.getElementById('runModal');
+    if (runModal) {
+        runModal.style.display = 'none';
+    }
     document.body.classList.remove('running');
     
     // 重置显示
@@ -279,19 +316,21 @@ function updateStepDisplay() {
     const steps = stepCount;
     const percent = Math.min(100, Math.round(steps / settings.stepTarget * 100));
     
-    document.getElementById('stepCount').textContent = steps.toLocaleString();
-    document.getElementById('targetProgress').style.width = percent + '%';
-    document.getElementById('targetPercent').textContent = percent + '%';
-    document.getElementById('stepTarget').textContent = settings.stepTarget.toLocaleString();
+    const stepCountEl = document.getElementById('stepCount');
+    const targetProgressEl = document.getElementById('targetProgress');
+    const targetPercentEl = document.getElementById('targetPercent');
+    const stepTargetEl = document.getElementById('stepTarget');
+    const caloriesEl = document.getElementById('calories');
+    const distanceEl = document.getElementById('distance');
+    const activeTimeEl = document.getElementById('activeTime');
     
-    // 更新卡路里（粗略估算：每步约0.04千卡）
-    document.getElementById('calories').textContent = Math.round(steps * 0.04);
-    
-    // 更新距离（公里）
-    document.getElementById('distance').textContent = (steps * settings.stepLength / 100 / 1000).toFixed(1);
-    
-    // 更新活跃时间（假设每步0.5秒）
-    document.getElementById('activeTime').textContent = Math.round(steps * 0.5 / 60);
+    if (stepCountEl) stepCountEl.textContent = steps.toLocaleString();
+    if (targetProgressEl) targetProgressEl.style.width = percent + '%';
+    if (targetPercentEl) targetPercentEl.textContent = percent + '%';
+    if (stepTargetEl) stepTargetEl.textContent = settings.stepTarget.toLocaleString();
+    if (caloriesEl) caloriesEl.textContent = Math.round(steps * 0.04);
+    if (distanceEl) distanceEl.textContent = (steps * settings.stepLength / 100 / 1000).toFixed(1);
+    if (activeTimeEl) activeTimeEl.textContent = Math.round(steps * 0.5 / 60);
 }
 
 function updateTodayHistory() {
@@ -300,6 +339,7 @@ function updateTodayHistory() {
     const todayRuns = data.runs.filter(r => r.date === today);
     
     const container = document.getElementById('todayHistory');
+    if (!container) return;
     
     if (todayRuns.length === 0) {
         container.innerHTML = '<p class="empty-state">暂无记录，开始你的第一次运动吧！</p>';
@@ -352,17 +392,19 @@ function updateWeekStats() {
     
     // 渲染柱状图
     const chartContainer = document.getElementById('weekChart');
-    chartContainer.innerHTML = weekData.map(d => {
-        const height = maxSteps > 0 ? Math.max(5, (d.steps / maxSteps) * 80) : 5;
-        const isToday = d.isToday ? 'background: linear-gradient(180deg, #48bb78 0%, #68d391 100%);' : '';
-        return `
-            <div class="week-bar">
-                <div class="week-bar-value">${d.steps > 0 ? Math.round(d.steps / 1000) + 'k' : ''}</div>
-                <div class="week-bar-fill" style="height: ${height}px; ${isToday}"></div>
-                <div class="week-bar-label">${d.day}</div>
-            </div>
-        `;
-    }).join('');
+    if (chartContainer) {
+        chartContainer.innerHTML = weekData.map(d => {
+            const height = maxSteps > 0 ? Math.max(5, (d.steps / maxSteps) * 80) : 5;
+            const isToday = d.isToday ? 'background: linear-gradient(180deg, #48bb78 0%, #68d391 100%);' : '';
+            return `
+                <div class="week-bar">
+                    <div class="week-bar-value">${d.steps > 0 ? Math.round(d.steps / 1000) + 'k' : ''}</div>
+                    <div class="week-bar-fill" style="height: ${height}px; ${isToday}"></div>
+                    <div class="week-bar-label">${d.day}</div>
+                </div>
+            `;
+        }).join('');
+    }
     
     // 周统计
     const weekTotalSteps = weekData.reduce((sum, d) => sum + d.steps, 0);
@@ -371,8 +413,10 @@ function updateWeekStats() {
         return runDate >= weekStart && runDate <= today;
     }).length;
     
-    document.getElementById('weekSteps').textContent = (weekTotalSteps / 1000).toFixed(1) + 'k';
-    document.getElementById('weekRuns').textContent = weekTotalRuns;
+    const weekStepsEl = document.getElementById('weekSteps');
+    const weekRunsEl = document.getElementById('weekRuns');
+    if (weekStepsEl) weekStepsEl.textContent = (weekTotalSteps / 1000).toFixed(1) + 'k';
+    if (weekRunsEl) weekRunsEl.textContent = weekTotalRuns;
 }
 
 function formatDuration(seconds) {
@@ -391,15 +435,22 @@ function calculatePace(distanceMeters, durationSeconds) {
 
 // ============ 设置 ============
 function openSettings() {
+    console.log('打开设置被调用');
     const settings = getSettings();
-    document.getElementById('settingStepTarget').value = settings.stepTarget;
-    document.getElementById('settingRunTarget').value = settings.runTarget;
-    document.getElementById('settingStepLength').value = settings.stepLength;
-    document.getElementById('settingsModal').style.display = 'flex';
+    const stepTargetEl = document.getElementById('settingStepTarget');
+    const runTargetEl = document.getElementById('settingRunTarget');
+    const stepLengthEl = document.getElementById('settingStepLength');
+    const settingsModal = document.getElementById('settingsModal');
+    
+    if (stepTargetEl) stepTargetEl.value = settings.stepTarget;
+    if (runTargetEl) runTargetEl.value = settings.runTarget;
+    if (stepLengthEl) stepLengthEl.value = settings.stepLength;
+    if (settingsModal) settingsModal.style.display = 'flex';
 }
 
 function closeSettings() {
-    document.getElementById('settingsModal').style.display = 'none';
+    const settingsModal = document.getElementById('settingsModal');
+    if (settingsModal) settingsModal.style.display = 'none';
 }
 
 function saveSettings() {
@@ -417,7 +468,9 @@ function saveSettings() {
 function showTab(tab) {
     // 移除所有active
     document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-    event.currentTarget.classList.add('active');
+    if (event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+    }
     
     // 显示对应内容（目前是单页，后续可扩展）
     if (tab !== 'today') {
@@ -427,10 +480,15 @@ function showTab(tab) {
 
 // ============ 初始化 ============
 function init() {
+    console.log('App初始化开始');
+    
     // 设置日期
     const now = new Date();
-    document.getElementById('currentDate').textContent = 
-        now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+    const currentDateEl = document.getElementById('currentDate');
+    if (currentDateEl) {
+        currentDateEl.textContent = 
+            now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+    }
     
     // 从本地存储恢复今日步数（模拟）
     const data = getData();
@@ -451,21 +509,25 @@ function init() {
     // 注册Service Worker
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js')
-            .then(reg => console.log('SW registered'))
+            .then(reg => console.log('SW registered successfully'))
             .catch(err => console.warn('SW registration failed:', err));
     }
     
     // 模拟步数（桌面端测试用）
     simulateSteps();
     
-    console.log('🏃 运动记录App已初始化');
+    console.log('🏃 运动记录App已初始化完成');
 }
 
 // 桌面端模拟步数（用于测试）
 function simulateSteps() {
     // 在移动设备上不运行模拟
-    if ('ontouchstart' in window) return;
+    if ('ontouchstart' in window) {
+        console.log('移动设备，不运行步数模拟');
+        return;
+    }
     
+    console.log('桌面设备，运行步数模拟');
     // 每3秒随机增加步数（模拟走路）
     setInterval(() => {
         if (!isRunning) {
@@ -490,5 +552,9 @@ window.addEventListener('beforeunload', () => {
     saveData(data);
 });
 
-// 启动
-document.addEventListener('DOMContentLoaded', init);
+// 启动 - 等待DOM加载完成
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
