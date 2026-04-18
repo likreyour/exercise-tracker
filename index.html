@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>🏃 运动记录 - 每日步数与跑步</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- 顶部标题 -->
+        <header class="header">
+            <h1>🏃 运动记录</h1>
+            <p class="date" id="currentDate"></p>
+        </header>
+
+        <!-- 步数卡片 -->
+        <section class="card step-card">
+            <div class="step-main">
+                <div class="step-circle" id="stepCircle">
+                    <span class="step-num" id="stepCount">0</span>
+                    <span class="step-unit">步</span>
+                </div>
+                <div class="step-info">
+                    <div class="target-bar">
+                        <div class="target-progress" id="targetProgress" style="width: 0%"></div>
+                    </div>
+                    <p class="target-text">目标 <span id="stepTarget">10,000</span> 步</p>
+                    <p class="target-percent" id="targetPercent">0%</p>
+                </div>
+            </div>
+            <div class="step-stats">
+                <div class="stat-item">
+                    <span class="stat-icon">🔥</span>
+                    <span class="stat-val" id="calories">0</span>
+                    <span class="stat-label">千卡</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">⏱️</span>
+                    <span class="stat-val" id="activeTime">0</span>
+                    <span class="stat-label">活跃分钟</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">📍</span>
+                    <span class="stat-val" id="distance">0</span>
+                    <span class="stat-label">公里</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 操作按钮 -->
+        <section class="actions">
+            <button class="btn btn-primary" id="startRun" onclick="startRun()">
+                🏃 开始跑步
+            </button>
+            <button class="btn btn-secondary" onclick="openSettings()">
+                ⚙️ 设置
+            </button>
+        </section>
+
+        <!-- 今日历史 -->
+        <section class="card history-card">
+            <h2>📅 今日记录</h2>
+            <div id="todayHistory">
+                <p class="empty-state">暂无记录，开始你的第一次运动吧！</p>
+            </div>
+        </section>
+
+        <!-- 周统计 -->
+        <section class="card week-card">
+            <h2>📊 本周数据</h2>
+            <div class="week-chart" id="weekChart"></div>
+            <div class="week-summary">
+                <div class="summary-item">
+                    <span>本周总步数</span>
+                    <strong id="weekSteps">0</strong>
+                </div>
+                <div class="summary-item">
+                    <span>本周跑步</span>
+                    <strong id="weekRuns">0</strong> 次
+                </div>
+            </div>
+        </section>
+
+        <!-- 底部导航 -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" onclick="showTab('today')">
+                <span class="nav-icon">🏠</span>
+                <span>今日</span>
+            </button>
+            <button class="nav-item" onclick="showTab('history')">
+                <span class="nav-icon">📋</span>
+                <span>历史</span>
+            </button>
+            <button class="nav-item" onclick="showTab('stats')">
+                <span class="nav-icon">📈</span>
+                <span>统计</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- 跑步中弹窗 -->
+    <div class="modal" id="runModal" style="display:none">
+        <div class="modal-content run-active">
+            <div class="run-header">
+                <h2>🏃 跑步进行中</h2>
+                <span class="run-time" id="runTime">00:00</span>
+            </div>
+            <div class="run-stats-grid">
+                <div class="run-stat">
+                    <span class="run-stat-val" id="runDistance">0.00</span>
+                    <span class="run-stat-label">公里</span>
+                </div>
+                <div class="run-stat">
+                    <span class="run-stat-val" id="runPace">--:--</span>
+                    <span class="run-stat-label">配速</span>
+                </div>
+                <div class="run-stat">
+                    <span class="run-stat-val" id="runSpeed">0.0</span>
+                    <span class="run-stat-label">公里/时</span>
+                </div>
+            </div>
+            <div class="run-map" id="runMap">
+                <div class="map-placeholder" id="mapPlaceholder">
+                    📍 GPS定位中...
+                </div>
+                <canvas id="trackCanvas"></canvas>
+            </div>
+            <div class="run-actions">
+                <button class="btn btn-danger" onclick="stopRun()">停止跑步</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置弹窗 -->
+    <div class="modal" id="settingsModal" style="display:none">
+        <div class="modal-content">
+            <h2>⚙️ 设置</h2>
+            <div class="setting-item">
+                <label>每日步数目标</label>
+                <input type="number" id="settingStepTarget" value="10000" min="1000" max="50000">
+            </div>
+            <div class="setting-item">
+                <label>跑步目标（公里）</label>
+                <input type="number" id="settingRunTarget" value="5" min="0.1" max="100" step="0.1">
+            </div>
+            <div class="setting-item">
+                <label>步长（厘米）</label>
+                <input type="number" id="settingStepLength" value="70" min="40" max="120">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeSettings()">取消</button>
+                <button class="btn btn-primary" onclick="saveSettings()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
