@@ -1282,6 +1282,7 @@ body.running .step-circle {
 .chart-card {
     padding-bottom: 12px;
     overflow: hidden;
+    max-width: 100%;
 }
 
 .chart-container {

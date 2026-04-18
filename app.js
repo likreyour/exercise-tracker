@@ -1543,10 +1543,24 @@ window.addEventListener('beforeunload', () => {
 
 // 启动 + 隐藏加载画面
 function safeStart() {
-    init();
+    try {
+        init();
+    } catch (e) {
+        console.error('Init error:', e);
+    }
     // 延迟隐藏加载画面，确保首帧渲染
     requestAnimationFrame(() => {
-        requestAnimationFrame(() => hideLoadingScreen());
+        requestAnimationFrame(() => {
+            hideLoadingScreen();
+            // 最终保障：如果5秒后还在转圈，强制移除
+            setTimeout(() => {
+                const screen = document.getElementById('appLoadingScreen');
+                if (screen) {
+                    screen.classList.add('hidden');
+                    screen.style.display = 'none';
+                }
+            }, 5000);
+        });
     });
 }
 if (document.readyState === 'loading') {
