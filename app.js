@@ -286,14 +286,9 @@ async function startRun() {
     lastPosition = null;
     amap跑步路径 = [];
     lastAnnouncedKm = 0;
+    runTimer = setInterval(updateRunTime, 1000);
+    updateRunTime(); // Immediate update
 
-    const runModal = document.getElementById('runModal');
-    if (runModal) {
-        runModal.style.display = 'flex';
-        document.body.classList.add('running');
-    }
-
-    // 根据用户设置的地图提供商初始化地图
     const settings = getSettings();
     if (settings.mapProvider === 'osm') {
         // OpenStreetMap
@@ -310,7 +305,12 @@ async function startRun() {
         if (osmContainer) osmContainer.style.display = 'none';
         initAmapMap();
     }
-    runTimer = setInterval(updateRunTime, 1000);
+
+    const runModal = document.getElementById('runModal');
+    if (runModal) {
+        runModal.style.display = 'flex';
+        document.body.classList.add('running');
+    }
 
     runWatchId = navigator.geolocation.watchPosition(
         updateRunPosition,
@@ -507,11 +507,14 @@ function haversineDistance(pos1, pos2) {
 }
 
 function updateRunTime() {
+    if (!runStartTime) return;
     const elapsed = Math.floor((Date.now() - runStartTime) / 1000);
     const minutes = Math.floor(elapsed / 60);
     const seconds = elapsed % 60;
     const el = document.getElementById('runTime');
-    if (el) el.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    if (el) {
+        el.textContent = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+    }
 }
 
 function updateRunStats() {
@@ -568,7 +571,7 @@ function stopRun() {
             distance: runDistance,
             duration: Math.floor((Date.now() - runStartTime) / 1000),
             path: runPath,
-            calories: Math.round(runDistance * 0.6),
+            calories: Math.round(calculateCalories(runDistance, Math.floor((Date.now() - runStartTime) / 1000))),
             note: ''
         };
         data.runs.push(run);
@@ -686,7 +689,7 @@ function renderHistoryList(runs) {
             const durMin = Math.floor(run.duration / 60);
             const durSec = run.duration % 60;
             const durationStr = `${durMin}分${durSec}秒`;
-            const calories = run.calories || Math.round(run.distance * 0.6);
+            const calories = run.calories || Math.round(calculateCalories(run.distance, run.duration));
             const noteIcon = run.note ? '💬' : '';
 
             return `
@@ -750,7 +753,7 @@ function showRunDetail(runId) {
         const durSec = run.duration % 60;
         const durFormatted = `${String(durMin).padStart(2,'0')}:${String(durSec).padStart(2,'0')}`;
         const pace = formatPace(run.distance, run.duration);
-        const calories = run.calories || Math.round(run.distance * 0.6);
+        const calories = run.calories || Math.round(calculateCalories(run.distance, run.duration));
         const avgSpeed = run.duration > 0 ? ((run.distance / 1000) / (run.duration / 3600)).toFixed(1) : '0.0';
 
         statsEl.innerHTML = `
@@ -976,7 +979,7 @@ function updateStatsPage() {
     const totalRuns = runs.length;
     const totalDistance = runs.reduce((s, r) => s + r.distance, 0) / 1000;
     const totalDuration = runs.reduce((s, r) => s + r.duration, 0) / 60;
-    const totalCalories = runs.reduce((s, r) => s + (r.calories || Math.round(r.distance * 0.6)), 0);
+    const totalCalories = runs.reduce((s, r) => s + (r.calories || Math.round(calculateCalories(r.distance, r.duration))), 0);
 
     let avgPace = '--:--';
     if (totalDistance > 0) {
@@ -997,9 +1000,77 @@ function updateStatsPage() {
     setIf('totalCalories', totalCalories);
     setIf('totalSteps', Math.round(totalDistance * 1300).toLocaleString());
 
+    // Show empty state if no data
+    const emptyTip = document.getElementById('statsEmptyTip');
+    if (emptyTip) {
+        emptyTip.style.display = totalRuns === 0 ? 'block' : 'none';
+    }
+
     drawWeekChart(runs);
     drawMonthGrid(runs);
     drawMonthTrend(runs);
+    drawWeeklySummary(runs);
+    drawMonthCompare(runs);
+}
+
+function drawWeeklySummary(runs) {
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+
+    const weekRuns = runs.filter(r => {
+        const rd = new Date(r.date);
+        return rd >= weekStart && rd <= today;
+    });
+
+    const weekTotalDist = weekRuns.reduce((s, r) => s + r.distance / 1000, 0);
+    const weekTotalTime = weekRuns.reduce((s, r) => s + r.duration, 0) / 60;
+    const weekTotalCal = weekRuns.reduce((s, r) => s + (r.calories || Math.round(calculateCalories(r.distance, r.duration))), 0);
+    const weekAvgPaceVal = weekTotalDist > 0 ? weekTotalTime / weekTotalDist : 0;
+    const weekBestRunDist = weekRuns.reduce((max, r) => Math.max(max, r.distance / 1000), 0);
+
+    const setIf = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+    };
+
+    setIf('weekRunsCount', weekRuns.length);
+    setIf('weekTotalDist', weekTotalDist.toFixed(1));
+    setIf('weekTotalTime', Math.round(weekTotalTime));
+    setIf('weekTotalCal', weekTotalCal);
+    setIf('weekAvgPace', weekAvgPaceVal > 0 ? `${Math.floor(weekAvgPaceVal)}:${String(Math.round((weekAvgPaceVal - Math.floor(weekAvgPaceVal)) * 60)).padStart(2, '0')}` : '--:--');
+    setIf('weekBestRun', weekBestRunDist > 0 ? weekBestRunDist.toFixed(2) + ' km' : '-');
+}
+
+function drawMonthCompare(runs) {
+    const today = new Date();
+    const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+
+    const thisMonthRuns = runs.filter(r => {
+        const rd = new Date(r.date);
+        return rd >= thisMonthStart && rd <= today;
+    });
+
+    const lastMonthRuns = runs.filter(r => {
+        const rd = new Date(r.date);
+        return rd >= lastMonthStart && rd <= lastMonthEnd;
+    });
+
+    const thisMonthDist = thisMonthRuns.reduce((s, r) => s + r.distance / 1000, 0);
+    const lastMonthDist = lastMonthRuns.reduce((s, r) => s + r.distance / 1000, 0);
+
+    const setIf = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+    };
+
+    setIf('thisMonthRuns', thisMonthRuns.length);
+    setIf('lastMonthRuns', lastMonthRuns.length);
+    setIf('thisMonthDist', thisMonthDist.toFixed(1));
+    setIf('lastMonthDist', lastMonthDist.toFixed(1));
 }
 
 function drawWeekChart(runs) {
@@ -1035,7 +1106,13 @@ function drawWeekChart(runs) {
     const barWidth = (w - 60) / 7;
     const chartH = h - 40;
     const colors = weekData.map(d => d.isToday ? '#48bb78' : '#667eea');
+    const gradientTops = ['#a3bffa', '#68d391'];
 
+    ctx.fillStyle = '#718096';
+    ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'right';
+    
+    // Y-axis grid lines and labels
     ctx.strokeStyle = '#e2e8f0';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
@@ -1044,11 +1121,15 @@ function drawWeekChart(runs) {
         ctx.moveTo(30, y);
         ctx.lineTo(w - 10, y);
         ctx.stroke();
-        ctx.fillStyle = '#a0aec0';
-        ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
-        ctx.textAlign = 'right';
-        ctx.fillText((maxDist * (4 - i) / 4).toFixed(1) + 'km', 28, y + 3);
+        ctx.fillText((maxDist * (4 - i) / 4).toFixed(1) + ' km', 28, y + 3);
     }
+
+    // X-axis baseline
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.beginPath();
+    ctx.moveTo(30, 10 + chartH);
+    ctx.lineTo(w - 10, 10 + chartH);
+    ctx.stroke();
 
     weekData.forEach((d, i) => {
         const barH = maxDist > 0 ? (d.dist / maxDist) * (chartH - 20) : 0;
@@ -1056,14 +1137,29 @@ function drawWeekChart(runs) {
         const y = 10 + chartH - barH;
 
         const gradient = ctx.createLinearGradient(x, y, x, 10 + chartH);
-        gradient.addColorStop(0, colors[i]);
-        gradient.addColorStop(1, i === weekData.findIndex(dd => dd.isToday) ? '#68d391' : '#a3bffa');
+        const isToday = weekData.findIndex(dd => dd.isToday);
+        gradient.addColorStop(0, isToday === i ? '#48bb78' : '#667eea');
+        gradient.addColorStop(1, isToday === i ? '#68d391' : '#a3bffa');
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.roundRect(x + 2, y, barWidth - 4, barH, 4);
+        const bw = barWidth - 4;
+        const bh = barH;
+        const rx = x + 2;
+        const ry = y;
+        const r = 4;
+        // Rounded rect without native support
+        ctx.moveTo(rx + r, ry);
+        ctx.lineTo(rx + bw - r, ry);
+        ctx.quadraticCurveTo(rx + bw, ry, rx + bw, ry + r);
+        ctx.lineTo(rx + bw, ry + bh);
+        ctx.lineTo(rx, ry + bh);
+        ctx.lineTo(rx, ry + r);
+        ctx.quadraticCurveTo(rx, ry, rx + r, ry);
+        ctx.closePath();
         ctx.fill();
 
+        // Value label on top
         if (d.dist > 0) {
             ctx.fillStyle = '#2d3748';
             ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
@@ -1071,10 +1167,19 @@ function drawWeekChart(runs) {
             ctx.fillText(d.dist.toFixed(1), x + barWidth / 2, y - 4);
         }
 
+        // Day label below
         ctx.fillStyle = d.isToday ? '#48bb78' : '#718096';
         ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(d.day, x + barWidth / 2, 10 + chartH + 16);
+        
+        // Today indicator dot
+        if (d.isToday) {
+            ctx.beginPath();
+            ctx.arc(x + barWidth / 2, 10 + chartH + 22, 3, 0, Math.PI * 2);
+            ctx.fillStyle = '#48bb78';
+            ctx.fill();
+        }
     });
 }
 
@@ -1103,7 +1208,6 @@ function drawMonthGrid(runs) {
     }
 
     for (let d = 1; d <= daysInMonth; d++) {
-        if (d < 1 || d > 31) continue; // safeguard: skip invalid day numbers
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         let cls = 'month-day';
         if (runDates.has(dateStr)) cls += ' has-run';
@@ -1135,7 +1239,8 @@ function drawMonthTrend(runs) {
             .reduce((s, r) => s + r.distance / 1000, 0);
         months.push({
             label: `${d.getMonth() + 1}月`,
-            dist
+            dist,
+            isCurrent: i === 0
         });
     }
 
@@ -1143,15 +1248,26 @@ function drawMonthTrend(runs) {
     const chartH = h - 40;
     const barW = (w - 40) / 6;
 
+    // Grid lines
     ctx.strokeStyle = '#e2e8f0';
     ctx.lineWidth = 1;
+    ctx.fillStyle = '#a0aec0';
+    ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'right';
     for (let i = 0; i <= 3; i++) {
         const y = 10 + (chartH / 3) * i;
         ctx.beginPath();
         ctx.moveTo(30, y);
         ctx.lineTo(w - 10, y);
         ctx.stroke();
+        ctx.fillText((maxDist * (3 - i) / 3).toFixed(1) + ' km', 28, y + 3);
     }
+
+    // Baseline
+    ctx.beginPath();
+    ctx.moveTo(30, 10 + chartH);
+    ctx.lineTo(w - 10, 10 + chartH);
+    ctx.stroke();
 
     months.forEach((m, i) => {
         const barH = (m.dist / maxDist) * (chartH - 10);
@@ -1159,14 +1275,27 @@ function drawMonthTrend(runs) {
         const y = 10 + chartH - barH;
 
         const gradient = ctx.createLinearGradient(x, y, x, 10 + chartH);
-        gradient.addColorStop(0, '#48bb78');
-        gradient.addColorStop(1, '#68d391');
+        gradient.addColorStop(0, m.isCurrent ? '#48bb78' : '#667eea');
+        gradient.addColorStop(1, m.isCurrent ? '#68d391' : '#a3bffa');
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.roundRect(x, y, barW - 8, barH, 4);
+        const bw = barW - 8;
+        const bh = barH;
+        const rx = x;
+        const ry = y;
+        const r = 4;
+        ctx.moveTo(rx + r, ry);
+        ctx.lineTo(rx + bw - r, ry);
+        ctx.quadraticCurveTo(rx + bw, ry, rx + bw, ry + r);
+        ctx.lineTo(rx + bw, ry + bh);
+        ctx.lineTo(rx, ry + bh);
+        ctx.lineTo(rx, ry + r);
+        ctx.quadraticCurveTo(rx, ry, rx + r, ry);
+        ctx.closePath();
         ctx.fill();
 
+        // Value on top
         if (m.dist > 0) {
             ctx.fillStyle = '#2d3748';
             ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
@@ -1174,10 +1303,19 @@ function drawMonthTrend(runs) {
             ctx.fillText(m.dist.toFixed(1), x + (barW - 8) / 2, y - 4);
         }
 
-        ctx.fillStyle = '#718096';
+        // Month label
+        ctx.fillStyle = m.isCurrent ? '#48bb78' : '#718096';
         ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(m.label, x + (barW - 8) / 2, 10 + chartH + 14);
+        
+        // Current month dot
+        if (m.isCurrent) {
+            ctx.beginPath();
+            ctx.arc(x + (barW - 8) / 2, 10 + chartH + 20, 3, 0, Math.PI * 2);
+            ctx.fillStyle = '#48bb78';
+            ctx.fill();
+        }
     });
 }
 
@@ -1302,6 +1440,29 @@ function formatDuration(seconds) {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}分${secs}秒`;
+}
+
+// ============ Calorie Calculation (MET-based) ============
+function calculateCalories(distanceMeters, durationSeconds) {
+    // MET values for running based on speed
+    // Using simplified formula: Calories = MET * weight(kg) * time(hours)
+    // Assume average weight of 70kg, MET for jogging ~7, running ~9.8
+    const distanceKm = distanceMeters / 1000;
+    const hours = durationSeconds / 3600;
+    if (hours <= 0) return 0;
+    
+    // Calculate speed in km/h to determine MET
+    const speedKmh = distanceKm / hours;
+    let met;
+    if (speedKmh < 6) met = 5.0;        // walking/jogging
+    else if (speedKmh < 8) met = 7.0;   // light jogging
+    else if (speedKmh < 10) met = 8.3;  // jogging
+    else if (speedKmh < 12) met = 9.8;  // run
+    else if (speedKmh < 14) met = 11.0; // run
+    else met = 12.5;                     // fast run
+    
+    const weightKg = 70;
+    return met * weightKg * hours;
 }
 
 function formatPace(distanceMeters, durationSeconds) {

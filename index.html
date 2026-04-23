@@ -311,6 +311,12 @@
                         <span class="overview-label">总步数</span>
                     </div>
                 </div>
+                <!-- 空状态提示 -->
+                <div class="stats-empty-tip" id="statsEmptyTip" style="display:none">
+                    <span class="stats-empty-icon">📊</span>
+                    <p>还没有跑步记录</p>
+                    <small>开始你的第一次跑步，记录运动数据！</small>
+                </div>
             </section>
 
             <!-- 周柱状图 -->
@@ -338,6 +344,70 @@
                 </div>
                 <div class="chart-legend">
                     <span class="legend-item"><span class="legend-dot" style="background:#48bb78"></span>月度里程</span>
+                </div>
+            </section>
+
+            <!-- 周统计摘要 -->
+            <section class="card weekly-summary-card">
+                <h2>📅 本周运动摘要</h2>
+                <div class="weekly-summary-grid" id="weeklySummaryGrid">
+                    <div class="summary-stat">
+                        <span class="summary-icon">🏃</span>
+                        <span class="summary-val" id="weekRunsCount">0</span>
+                        <span class="summary-label">跑步次数</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span class="summary-icon">📍</span>
+                        <span class="summary-val" id="weekTotalDist">0</span>
+                        <span class="summary-label">总里程(km)</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span class="summary-icon">⏱️</span>
+                        <span class="summary-val" id="weekTotalTime">0</span>
+                        <span class="summary-label">总时长(分钟)</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span class="summary-icon">🔥</span>
+                        <span class="summary-val" id="weekTotalCal">0</span>
+                        <span class="summary-label">消耗千卡</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span class="summary-icon">⚡</span>
+                        <span class="summary-val" id="weekAvgPace">--:--</span>
+                        <span class="summary-label">平均配速</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span class="summary-icon">👟</span>
+                        <span class="summary-val" id="weekBestRun">-</span>
+                        <span class="summary-label">最佳单次</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 月度对比 -->
+            <section class="card monthly-compare-card">
+                <h2>📊 本月 vs 上月</h2>
+                <div class="compare-grid" id="monthCompareGrid">
+                    <div class="compare-item">
+                        <span class="compare-label">本月跑步</span>
+                        <span class="compare-val" id="thisMonthRuns">0</span>
+                        <span class="compare-unit">次</span>
+                    </div>
+                    <div class="compare-item">
+                        <span class="compare-label">上月跑步</span>
+                        <span class="compare-val" id="lastMonthRuns">0</span>
+                        <span class="compare-unit">次</span>
+                    </div>
+                    <div class="compare-item">
+                        <span class="compare-label">本月里程</span>
+                        <span class="compare-val" id="thisMonthDist">0</span>
+                        <span class="compare-unit">km</span>
+                    </div>
+                    <div class="compare-item">
+                        <span class="compare-label">上月里程</span>
+                        <span class="compare-val" id="lastMonthDist">0</span>
+                        <span class="compare-unit">km</span>
+                    </div>
                 </div>
             </section>
         </div>

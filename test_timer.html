@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timer Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .timer { font-size: 48px; font-weight: bold; color: #333; }
+        button { font-size: 20px; padding: 10px 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Timer Test</h1>
+    <div class="timer" id="runTime">00:00</div>
+    <br>
+    <button onclick="startTimer()">Start Timer</button>
+    <button onclick="stopTimer()">Stop Timer</button>
+    
+    <script>
+        let runStartTime = null;
+        let runTimer = null;
+        
+        function startTimer() {
+            console.log('Starting timer...');
+            runStartTime = Date.now();
+            runTimer = setInterval(updateRunTime, 1000);
+            console.log('Timer started, runStartTime:', runStartTime);
+        }
+        
+        function stopTimer() {
+            if (runTimer) {
+                clearInterval(runTimer);
+                runTimer = null;
+                console.log('Timer stopped');
+            }
+        }
+        
+        function updateRunTime() {
+            console.log('updateRunTime called, runStartTime:', runStartTime);
+            if (!runStartTime) {
+                console.warn('runStartTime is null!');
+                return;
+            }
+            const elapsed = Math.floor((Date.now() - runStartTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            const text = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+            const el = document.getElementById('runTime');
+            if (el) {
+                el.textContent = text;
+                console.log('Updated time to:', text);
+            } else {
+                console.warn('runTime element not found!');
+            }
+        }
+    </script>
+</body>
+</html>

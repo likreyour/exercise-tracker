@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>登录 - 运动记录</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="icon-192.svg">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #2d2d4a 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        .auth-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        /* Logo区域 */
+        .auth-logo {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .auth-logo-icon {
+            font-size: 64px;
+            margin-bottom: 12px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        
+        .auth-logo-title {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: #fff;
+        }
+        
+        .auth-logo-subtitle {
+            font-size: 14px;
+            color: rgba(255,255,255,0.6);
+            margin-top: 8px;
+        }
+        
+        /* 登录卡片 */
+        .auth-card {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(255,255,255,0.08);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 32px 24px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        /* Tab切换 */
+        .auth-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+        
+        .auth-tab {
+            flex: 1;
+            padding: 12px;
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.5);
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .auth-tab.active {
+            background: rgba(102, 126, 234, 0.4);
+            color: #fff;
+        }
+        
+        .auth-tab:hover:not(.active) {
+            color: rgba(255,255,255,0.8);
+        }
+        
+        /* 登录表单 */
+        .auth-form {
+            display: none;
+        }
+        
+        .auth-form.active {
+            display: block;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 13px;
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 8px;
+        }
+        
+        .form-input-row {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+        
+        .form-input:focus {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.15);
+        }
+        
+        .form-input::placeholder {
+            color: rgba(255,255,255,0.4);
+        }
+        
+        .form-select {
+            padding: 14px 16px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 16px;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        .form-select option {
+            background: #2d2d4a;
+            color: #fff;
+        }
+        
+        .btn-send-code {
+            padding: 14px 16px;
+            background: rgba(102, 126, 234, 0.4);
+            border: 1px solid rgba(102, 126, 234, 0.5);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-send-code:hover:not(:disabled) {
+            background: rgba(102, 126, 234, 0.6);
+        }
+        
+        .btn-send-code:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* 主登录按钮 */
+        .btn-auth {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 24px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-auth:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(102, 126, 234, 0.6);
+        }
+        
+        .btn-auth:active:not(:disabled) {
+            transform: translateY(0);
+        }
+        
+        .btn-auth:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        /* 第三方登录 */
+        .auth-divider {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 28px 0;
+            color: rgba(255,255,255,0.4);
+            font-size: 13px;
+        }
+        
+        .auth-divider::before,
+        .auth-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(255,255,255,0.15);
+        }
+        
+        .social-login {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+        }
+        
+        .btn-social {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.08);
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-social:hover {
+            background: rgba(255,255,255,0.15);
+            transform: translateY(-3px);
+        }
+        
+        .btn-social.wechat { font-size: 28px; }
+        .btn-social.apple { font-size: 26px; }
+        
+        /* 游客入口 */
+        .guest-entry {
+            text-align: center;
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .btn-guest {
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.6);
+            font-size: 15px;
+            cursor: pointer;
+            padding: 8px 16px;
+            transition: color 0.3s;
+        }
+        
+        .btn-guest:hover {
+            color: #fff;
+        }
+        
+        /* 协议文本 */
+        .auth-terms {
+            text-align: center;
+            font-size: 12px;
+            color: rgba(255,255,255,0.4);
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+        
+        .auth-terms a {
+            color: rgba(102, 126, 234, 0.9);
+            text-decoration: none;
+        }
+        
+        .auth-terms a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Toast */
+        .auth-toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: rgba(0,0,0,0.85);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            z-index: 9999;
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .auth-toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+        
+        .auth-toast.error {
+            background: rgba(220, 38, 38, 0.9);
+        }
+        
+        .auth-toast.success {
+            background: rgba(34, 197, 94, 0.9);
+        }
+        
+        /* Loading */
+        .auth-loading {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 9998;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .auth-loading.show {
+            display: flex;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.2);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* 密码输入 */
+        .password-wrapper {
+            position: relative;
+        }
+        
+        .btn-toggle-password {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.5);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 4px;
+        }
+        
+        .btn-toggle-password:hover {
+            color: rgba(255,255,255,0.8);
+        }
+        
+        /* 返回首页 */
+        .back-home {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.3s;
+        }
+        
+        .back-home:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        /* 协议弹窗 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .modal-overlay.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: #2d2d4a;
+            border-radius: 20px;
+            padding: 24px;
+            max-width: 400px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .btn-close-modal {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.6);
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        .modal-body {
+            font-size: 14px;
+            line-height: 1.8;
+            color: rgba(255,255,255,0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <button class="back-home" onclick="goHome()">
+            ← 返回首页
+        </button>
+        
+        <div class="auth-logo">
+            <div class="auth-logo-icon">🏃</div>
+            <div class="auth-logo-title">运动记录</div>
+            <div class="auth-logo-subtitle">记录每一次进步</div>
+        </div>
+        
+        <div class="auth-card">
+            <!-- Tab切换 -->
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="phone">手机登录</button>
+                <button class="auth-tab" data-tab="email">邮箱登录</button>
+            </div>
+            
+            <!-- 手机号登录 -->
+            <form class="auth-form active" id="phoneForm" onsubmit="handlePhoneLogin(event)">
+                <div class="form-group">
+                    <label class="form-label">手机号码</label>
+                    <div class="form-input-row">
+                        <select class="form-select" id="phonePrefix" style="width: 90px;">
+                            <option value="+86">+86</option>
+                            <option value="+852">+852</option>
+                            <option value="+853">+853</option>
+                            <option value="+886">+886</option>
+                        </select>
+                        <input type="tel" class="form-input" id="phoneNumber" 
+                               placeholder="请输入手机号" maxlength="15" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">验证码</label>
+                    <div class="form-input-row">
+                        <input type="text" class="form-input" id="phoneCode" 
+                               placeholder="请输入验证码" maxlength="6" required style="flex:1">
+                        <button type="button" class="btn-send-code" id="btnSendCode" 
+                                onclick="sendVerifyCode()">
+                            获取验证码
+                        </button>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn-auth" id="phoneSubmitBtn">
+                    登录 / 注册
+                </button>
+            </form>
+            
+            <!-- 邮箱登录 -->
+            <form class="auth-form" id="emailForm" onsubmit="handleEmailLogin(event)">
+                <div class="form-group">
+                    <label class="form-label">邮箱地址</label>
+                    <input type="email" class="form-input" id="emailAddress" 
+                           placeholder="请输入邮箱" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">密码</label>
+                    <div class="password-wrapper">
+                        <input type="password" class="form-input" id="emailPassword" 
+                               placeholder="请输入密码" required style="padding-right: 50px;">
+                        <button type="button" class="btn-toggle-password" 
+                                onclick="togglePassword('emailPassword')">
+                            👁
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="form-group" id="emailNicknameGroup" style="display:none;">
+                    <label class="form-label">昵称（选填）</label>
+                    <input type="text" class="form-input" id="emailNickname" 
+                           placeholder="设置您的昵称">
+                </div>
+                
+                <button type="submit" class="btn-auth" id="emailSubmitBtn">
+                    登录
+                </button>
+            </form>
+            
+            <!-- 第三方登录 -->
+            <div class="auth-divider">其他登录方式</div>
+            
+            <div class="social-login">
+                <button class="btn-social wechat" onclick="handleWechatLogin()" title="微信登录">
+                    💬
+                </button>
+                <button class="btn-social apple" onclick="handleAppleLogin()" title="Apple ID登录">
+                    🍎
+                </button>
+            </div>
+            
+            <!-- 游客入口 -->
+            <div class="guest-entry">
+                <button class="btn-guest" onclick="continueAsGuest()">
+                    游客模式继续使用 →
+                </button>
+            </div>
+            
+            <!-- 协议 -->
+            <div class="auth-terms">
+                登录即表示同意
+                <a href="#" onclick="showTerms('user')">《用户协议》</a>和
+                <a href="#" onclick="showTerms('privacy')">《隐私政策》</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast提示 -->
+    <div class="auth-toast" id="authToast">
+        <span id="toastIcon">✓</span>
+        <span id="toastMessage"></span>
+    </div>
+    
+    <!-- Loading -->
+    <div class="auth-loading" id="authLoading">
+        <div class="spinner"></div>
+    </div>
+    
+    <!-- 协议弹窗 -->
+    <div class="modal-overlay" id="termsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title" id="termsTitle">用户协议</span>
+                <button class="btn-close-modal" onclick="closeTermsModal()">×</button>
+            </div>
+            <div class="modal-body" id="termsBody">
+                <!-- 动态加载 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============ 配置 ============
+        const AUTH_CONFIG = {
+            // API配置（示例地址，需要替换为真实后端）
+            API_BASE: 'https://api.exercisetracker.com/v1',
+            // 验证码发送间隔（秒）
+            CODE_COOLDOWN: 60,
+            // 验证码有效期（秒）
+            CODE_EXPIRE: 300
+        };
+        
+        // ============ 状态 ============
+        let currentTab = 'phone';
+        let isLoginMode = true; // true=登录，false=注册
+        let codeCooldownTimer = null;
+        let pendingPhoneCodeId = null;
+        
+        // ============ 用户系统（本地实现） ============
+        const USER_STORAGE_KEY = 'exercise_user_v4';
+        const AUTH_TOKEN_KEY = 'exercise_auth_token';
+        
+        // 生成游客ID
+        function generateGuestId() {
+            return 'guest_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+        
+        // 获取当前用户
+        function getCurrentUser() {
+            try {
+                const user = localStorage.getItem(USER_STORAGE_KEY);
+                return user ? JSON.parse(user) : null;
+            } catch(e) {
+                return null;
+            }
+        }
+        
+        // 保存用户
+        function saveUser(user) {
+            localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+        }
+        
+        // 生成简单token（生产环境应使用JWT）
+        function generateToken(userId) {
+            return btoa(JSON.stringify({ userId, exp: Date.now() + 7*24*60*60*1000 }));
+        }
+        
+        // 保存token
+        function saveToken(token) {
+            localStorage.setItem(AUTH_TOKEN_KEY, token);
+        }
+        
+        // 获取token
+        function getToken() {
+            return localStorage.getItem(AUTH_TOKEN_KEY);
+        }
+        
+        // ============ Tab切换 ============
+        document.querySelectorAll('.auth-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                
+                document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(tabName + 'Form').classList.add('active');
+                
+                currentTab = tabName;
+                
+                // 切换时重置表单
+                const nicknameGroup = document.getElementById('emailNicknameGroup');
+                const submitBtn = document.getElementById('emailSubmitBtn');
+                if (tabName === 'email') {
+                    nicknameGroup.style.display = 'none';
+                    submitBtn.textContent = '登录';
+                    isLoginMode = true;
+                }
+            });
+        });
+        
+        // ============ 发送验证码 ============
+        function sendVerifyCode() {
+            const phone = document.getElementById('phoneNumber').value.trim();
+            
+            if (!phone || phone.length < 7) {
+                showToast('请输入正确的手机号', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('btnSendCode');
+            if (btn.disabled) return;
+            
+            // 模拟发送验证码（实际项目中调用后端API）
+            // 这里使用模拟实现
+            simulateSendCode(phone);
+        }
+        
+        function simulateSendCode(phone) {
+            const btn = document.getElementById('btnSendCode');
+            btn.disabled = true;
+            
+            // 模拟后端发送验证码
+            // 生产环境：调用 POST /api/auth/send-code
+            console.log('[模拟] 发送验证码到:', phone);
+            
+            // 生成模拟验证码ID
+            pendingPhoneCodeId = 'code_' + Date.now();
+            
+            // 模拟：3秒后显示发送成功
+            setTimeout(() => {
+                showToast('验证码已发送', 'success');
+                startCooldown();
+            }, 1000);
+        }
+        
+        function startCooldown() {
+            let seconds = AUTH_CONFIG.CODE_COOLDOWN;
+            const btn = document.getElementById('btnSendCode');
+            
+            updateCooldownText(seconds);
+            
+            codeCooldownTimer = setInterval(() => {
+                seconds--;
+                if (seconds <= 0) {
+                    clearInterval(codeCooldownTimer);
+                    btn.textContent = '获取验证码';
+                    btn.disabled = false;
+                } else {
+                    updateCooldownText(seconds);
+                }
+            }, 1000);
+        }
+        
+        function updateCooldownText(seconds) {
+            const btn = document.getElementById('btnSendCode');
+            btn.textContent = `${seconds}秒后重试`;
+        }
+        
+        // ============ 手机号登录/注册 ============
+        function handlePhoneLogin(event) {
+            event.preventDefault();
+            
+            const phone = document.getElementById('phoneNumber').value.trim();
+            const code = document.getElementById('phoneCode').value.trim();
+            
+            if (!code || code.length !== 6) {
+                showToast('请输入6位验证码', 'error');
+                return;
+            }
+            
+            // 模拟验证（实际项目中调用后端API验证）
+            simulatePhoneVerify(phone, code);
+        }
+        
+        function simulatePhoneVerify(phone, code) {
+            showLoading(true);
+            
+            // 模拟网络延迟
+            setTimeout(() => {
+                showLoading(false);
+                
+                // 模拟：123456是万能测试码
+                if (code === '123456' || pendingPhoneCodeId) {
+                    // 创建/获取用户
+                    let user = getCurrentUser();
+                    const isNewUser = !user;
+                    
+                    if (isNewUser) {
+                        user = {
+                            userId: generateGuestId(),
+                            provider: 'phone',
+                            phone: phone,
+                            nickname: '运动达人',
+                            avatar: '',
+                            profile: {
+                                height: 170,
+                                weight: 65,
+                                age: 25,
+                                gender: 'other',
+                                targetSteps: 10000,
+                                targetCalories: 500
+                            },
+                            isGuest: false,
+                            createdAt: Date.now(),
+                            updatedAt: Date.now(),
+                            lastLoginAt: Date.now()
+                        };
+                    } else {
+                        // 更新现有用户
+                        user.phone = phone;
+                        user.provider = 'phone';
+                        user.isGuest = false;
+                        user.updatedAt = Date.now();
+                        user.lastLoginAt = Date.now();
+                    }
+                    
+                    saveUser(user);
+                    saveToken(generateToken(user.userId));
+                    
+                    showToast(isNewUser ? '注册成功！' : '登录成功！', 'success');
+                    
+                    // 延迟跳转
+                    setTimeout(() => {
+                        goHome();
+                    }, 1000);
+                } else {
+                    showToast('验证码错误', 'error');
+                }
+            }, 1500);
+        }
+        
+        // ============ 邮箱登录/注册 ============
+        function handleEmailLogin(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('emailAddress').value.trim();
+            const password = document.getElementById('emailPassword').value;
+            const nickname = document.getElementById('emailNickname').value.trim();
+            
+            if (isLoginMode) {
+                // 登录
+                simulateEmailLogin(email, password);
+            } else {
+                // 注册
+                simulateEmailRegister(email, password, nickname);
+            }
+        }
+        
+        function simulateEmailLogin(email, password) {
+            if (!email || !password) {
+                showToast('请填写完整信息', 'error');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showToast('密码至少6位', 'error');
+                return;
+            }
+            
+            showLoading(true);
+            
+            setTimeout(() => {
+                showLoading(false);
+                
+                // 模拟验证（实际项目中调用后端API）
+                // 这里简单模拟：任意邮箱+6位密码可登录
+                let user = getCurrentUser();
+                const isNewUser = !user || user.provider !== 'email';
+                
+                if (isNewUser) {
+                    user = {
+                        userId: generateGuestId(),
+                        provider: 'email',
+                        email: email,
+                        nickname: nickname || '运动达人',
+                        avatar: '',
+                        profile: {
+                            height: 170,
+                            weight: 65,
+                            age: 25,
+                            gender: 'other',
+                            targetSteps: 10000,
+                            targetCalories: 500
+                        },
+                        isGuest: false,
+                        createdAt: Date.now(),
+                        updatedAt: Date.now(),
+                        lastLoginAt: Date.now()
+                    };
+                } else {
+                    user.email = email;
+                    user.updatedAt = Date.now();
+                    user.lastLoginAt = Date.now();
+                }
+                
+                saveUser(user);
+                saveToken(generateToken(user.userId));
+                
+                showToast('登录成功！', 'success');
+                setTimeout(() => goHome(), 1000);
+            }, 1500);
+        }
+        
+        function simulateEmailRegister(email, password, nickname) {
+            if (!email || !password) {
+                showToast('请填写完整信息', 'error');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showToast('密码至少6位', 'error');
+                return;
+            }
+            
+            if (!email.includes('@')) {
+                showToast('请输入正确的邮箱', 'error');
+                return;
+            }
+            
+            showLoading(true);
+            
+            setTimeout(() => {
+                showLoading(false);
+                
+                let user = getCurrentUser() || {};
+                user = {
+                    ...user,
+                    userId: user.userId || generateGuestId(),
+                    provider: 'email',
+                    email: email,
+                    nickname: nickname || '运动达人',
+                    isGuest: false,
+                    createdAt: user.createdAt || Date.now(),
+                    updatedAt: Date.now(),
+                    lastLoginAt: Date.now()
+                };
+                
+                saveUser(user);
+                saveToken(generateToken(user.userId));
+                
+                showToast('注册成功！', 'success');
+                setTimeout(() => goHome(), 1000);
+            }, 1500);
+        }
+        
+        // 检测是否为注册场景
+        document.getElementById('emailAddress').addEventListener('input', function() {
+            checkEmailMode();
+        });
+        
+        function checkEmailMode() {
+            const email = document.getElementById('emailAddress').value.trim();
+            const user = getCurrentUser();
+            
+            // 如果用户已存在且邮箱匹配，显示登录模式
+            if (user && user.email === email) {
+                isLoginMode = true;
+                document.getElementById('emailNicknameGroup').style.display = 'none';
+                document.getElementById('emailSubmitBtn').textContent = '登录';
+            } else {
+                // 否则显示注册模式
+                isLoginMode = false;
+                document.getElementById('emailNicknameGroup').style.display = 'block';
+                document.getElementById('emailSubmitBtn').textContent = '注册';
+            }
+        }
+        
+        // ============ 社交登录 ============
+        function handleWechatLogin() {
+            // 微信登录需要后端配合获取code
+            // 实际实现：
+            // 1. 跳转到微信授权页获取code
+            // 2. 用code换取token
+            // 这里显示提示
+            showToast('微信登录需要在微信中打开', 'error');
+            
+            // 模拟实现（仅用于测试）
+            // simulateSocialLogin('wechat');
+        }
+        
+        function handleAppleLogin() {
+            if (typeof window.AppleID !== 'undefined') {
+                // 使用Apple ID SDK
+                AppleID.auth.signIn().then(response => {
+                    simulateAppleLogin(response);
+                }).catch(error => {
+                    console.error('Apple登录失败:', error);
+                    showToast('Apple登录失败', 'error');
+                });
+            } else {
+                showToast('Apple登录仅支持iOS设备', 'error');
+            }
+        }
+        
+        function simulateSocialLogin(provider) {
+            showLoading(true);
+            
+            setTimeout(() => {
+                showLoading(false);
+                
+                let user = getCurrentUser() || {};
+                user = {
+                    ...user,
+                    userId: user.userId || generateGuestId(),
+                    provider: provider,
+                    nickname: provider === 'wechat' ? '微信用户' : 'Apple用户',
+                    isGuest: false,
+                    createdAt: user.createdAt || Date.now(),
+                    updatedAt: Date.now(),
+                    lastLoginAt: Date.now()
+                };
+                
+                saveUser(user);
+                saveToken(generateToken(user.userId));
+                
+                showToast('登录成功！', 'success');
+                setTimeout(() => goHome(), 1000);
+            }, 1500);
+        }
+        
+        function simulateAppleLogin(response) {
+            showLoading(true);
+            
+            setTimeout(() => {
+                showLoading(false);
+                
+                let user = getCurrentUser() || {};
+                user = {
+                    ...user,
+                    userId: user.userId || generateGuestId(),
+                    provider: 'apple',
+                    email: response.user || '',
+                    nickname: 'Apple用户',
+                    isGuest: false,
+                    createdAt: user.createdAt || Date.now(),
+                    updatedAt: Date.now(),
+                    lastLoginAt: Date.now()
+                };
+                
+                saveUser(user);
+                saveToken(generateToken(user.userId));
+                
+                showToast('登录成功！', 'success');
+                setTimeout(() => goHome(), 1000);
+            }, 1500);
+        }
+        
+        // ============ 游客模式 ============
+        function continueAsGuest() {
+            showLoading(true);
+            
+            setTimeout(() => {
+                showLoading(false);
+                
+                // 检查是否已有游客账号
+                let user = getCurrentUser();
+                
+                if (!user) {
+                    // 创建游客账号
+                    user = {
+                        userId: generateGuestId(),
+                        provider: 'guest',
+                        nickname: '游客',
+                        avatar: '',
+                        profile: {
+                            height: 170,
+                            weight: 65,
+                            age: 25,
+                            gender: 'other',
+                            targetSteps: 10000,
+                            targetCalories: 500
+                        },
+                        isGuest: true,
+                        createdAt: Date.now(),
+                        updatedAt: Date.now(),
+                        lastLoginAt: Date.now()
+                    };
+                    saveUser(user);
+                }
+                
+                // 游客不保存token，直接跳转
+                showToast('正在进入...', 'success');
+                setTimeout(() => goHome(), 500);
+            }, 800);
+        }
+        
+        // ============ 工具函数 ============
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            const btn = input.nextElementSibling;
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁';
+            }
+        }
+        
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('authToast');
+            const icon = document.getElementById('toastIcon');
+            const msg = document.getElementById('toastMessage');
+            
+            const icons = {
+                success: '✓',
+                error: '✕',
+                info: 'ℹ'
+            };
+            
+            toast.className = 'auth-toast show ' + type;
+            icon.textContent = icons[type] || icons.info;
+            msg.textContent = message;
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2500);
+        }
+        
+        function showLoading(show) {
+            const loading = document.getElementById('authLoading');
+            if (show) {
+                loading.classList.add('show');
+            } else {
+                loading.classList.remove('show');
+            }
+        }
+        
+        function goHome() {
+            // 返回首页
+            window.location.href = 'index.html';
+        }
+        
+        // ============ 协议弹窗 ============
+        function showTerms(type) {
+            event.preventDefault();
+            
+            const modal = document.getElementById('termsModal');
+            const title = document.getElementById('termsTitle');
+            const body = document.getElementById('termsBody');
+            
+            if (type === 'user') {
+                title.textContent = '用户协议';
+                body.innerHTML = `
+                    <p><strong>1. 服务说明</strong></p>
+                    <p>运动记录App提供运动数据记录、统计和分析服务。使用本应用即表示您同意遵守本协议。</p>
+                    <br>
+                    <p><strong>2. 数据使用</strong></p>
+                    <p>我们承诺保护您的个人隐私。您的运动数据仅用于为您提供更好的服务体验。</p>
+                    <br>
+                    <p><strong>3. 账号安全</strong></p>
+                    <p>请妥善保管您的账号信息，如发现异常登录请及时联系我们。</p>
+                    <br>
+                    <p><strong>4. 免责声明</strong></p>
+                    <p>本应用提供的运动数据仅供参考，不作为医疗诊断依据。</p>
+                `;
+            } else {
+                title.textContent = '隐私政策';
+                body.innerHTML = `
+                    <p><strong>1. 信息收集</strong></p>
+                    <p>我们收集您主动提供的个人信息（手机号、邮箱等）以及运动过程中产生的运动数据。</p>
+                    <br>
+                    <p><strong>2. 信息使用</strong></p>
+                    <p>您的信息用于：提供个性化服务、优化产品体验、安全保障。</p>
+                    <br>
+                    <p><strong>3. 信息共享</strong></p>
+                    <p>未经您的同意，我们不会与任何第三方共享您的个人信息。</p>
+                    <br>
+                    <p><strong>4. 数据存储</strong></p>
+                    <p>您的数据安全存储在我们的服务器中，您可以随时导出或删除您的数据。</p>
+                `;
+            }
+            
+            modal.classList.add('show');
+        }
+        
+        function closeTermsModal() {
+            document.getElementById('termsModal').classList.remove('show');
+        }
+        
+        // 点击背景关闭弹窗
+        document.getElementById('termsModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeTermsModal();
+            }
+        });
+        
+        // ============ 初始化 ============
+        (function initAuth() {
+            // 检查是否已登录
+            const user = getCurrentUser();
+            const token = getToken();
+            
+            // 如果已登录，直接跳转
+            if (user && token && !user.isGuest) {
+                // 验证token是否过期
+                try {
+                    const tokenData = JSON.parse(atob(token));
+                    if (tokenData.exp > Date.now()) {
+                        window.location.href = 'index.html';
+                        return;
+                    }
+                } catch(e) {
+                    // token格式错误，重新登录
+                }
+            }
+            
+            // 如果有预填邮箱，切换到邮箱tab
+            if (user && user.email) {
+                document.querySelector('[data-tab="email"]').click();
+                document.getElementById('emailAddress').value = user.email;
+                checkEmailMode();
+            }
+        })();
+    </script>
+</body>
+</html>

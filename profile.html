@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>个人资料 - 运动记录</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="icon-192.svg">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #2d2d4a 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        .profile-container {
+            min-height: 100vh;
+            padding-bottom: 100px;
+        }
+        
+        /* Header */
+        .profile-header {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            gap: 16px;
+            background: rgba(255,255,255,0.05);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .btn-back {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.3s;
+        }
+        
+        .btn-back:hover {
+            background: rgba(255,255,255,0.15);
+        }
+        
+        .profile-header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            flex: 1;
+        }
+        
+        .btn-save {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: #fff;
+            padding: 8px 18px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-save:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-save:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        /* 用户卡片 */
+        .user-card {
+            padding: 32px 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .avatar-container {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 16px;
+        }
+        
+        .avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            border: 3px solid rgba(255,255,255,0.2);
+            overflow: hidden;
+        }
+        
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .avatar-edit-btn {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #667eea;
+            border: 2px solid #2d2d4a;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+        
+        .avatar-edit-btn:hover {
+            background: #764ba2;
+            transform: scale(1.1);
+        }
+        
+        .user-provider-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            background: rgba(102, 126, 234, 0.3);
+            color: rgba(255,255,255,0.8);
+            margin-top: 8px;
+        }
+        
+        .user-provider-badge.guest {
+            background: rgba(255, 193, 7, 0.3);
+            color: #ffc107;
+        }
+        
+        /* 升级提示 */
+        .upgrade-banner {
+            margin: 16px 20px;
+            padding: 14px 16px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .upgrade-banner.hidden {
+            display: none;
+        }
+        
+        .upgrade-icon {
+            font-size: 28px;
+        }
+        
+        .upgrade-text {
+            flex: 1;
+        }
+        
+        .upgrade-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .upgrade-desc {
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+        }
+        
+        .btn-upgrade {
+            padding: 8px 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-upgrade:hover {
+            transform: translateY(-1px);
+        }
+        
+        /* 表单区域 */
+        .form-section {
+            padding: 20px;
+        }
+        
+        .section-title {
+            font-size: 13px;
+            color: rgba(255,255,255,0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+            padding-left: 4px;
+        }
+        
+        .form-card {
+            background: rgba(255,255,255,0.06);
+            border-radius: 16px;
+            padding: 4px 0;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        
+        .form-item {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        
+        .form-item:last-child {
+            border-bottom: none;
+        }
+        
+        .form-label {
+            width: 90px;
+            font-size: 15px;
+            color: rgba(255,255,255,0.7);
+            flex-shrink: 0;
+        }
+        
+        .form-control {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .form-input {
+            flex: 1;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
+            padding: 10px 14px;
+            color: #fff;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.3s;
+        }
+        
+        .form-input:focus {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+        
+        .form-input::placeholder {
+            color: rgba(255,255,255,0.4);
+        }
+        
+        .form-input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* 步数目标滑块 */
+        .goal-slider-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .goal-slider {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.15);
+            outline: none;
+        }
+        
+        .goal-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+        
+        .goal-value {
+            min-width: 60px;
+            text-align: right;
+            font-size: 15px;
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        /* 数值调节器 */
+        .stepper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .stepper-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .stepper-btn:hover {
+            background: rgba(102, 126, 234, 0.4);
+        }
+        
+        .stepper-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .stepper-value {
+            min-width: 70px;
+            text-align: center;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        /* 性别选择 */
+        .gender-select {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .gender-option {
+            flex: 1;
+            padding: 10px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
+            color: rgba(255,255,255,0.6);
+            font-size: 14px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .gender-option:hover {
+            border-color: rgba(102, 126, 234, 0.5);
+        }
+        
+        .gender-option.active {
+            background: rgba(102, 126, 234, 0.3);
+            border-color: #667eea;
+            color: #fff;
+        }
+        
+        /* 账号绑定 */
+        .account-item {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        
+        .account-item:last-child {
+            border-bottom: none;
+        }
+        
+        .account-icon {
+            font-size: 24px;
+            margin-right: 12px;
+        }
+        
+        .account-info {
+            flex: 1;
+        }
+        
+        .account-type {
+            font-size: 15px;
+            margin-bottom: 4px;
+        }
+        
+        .account-value {
+            font-size: 13px;
+            color: rgba(255,255,255,0.5);
+        }
+        
+        .account-value.linked {
+            color: #48bb78;
+        }
+        
+        .account-value.unlinked {
+            color: rgba(255,255,255,0.4);
+        }
+        
+        .btn-bind {
+            padding: 6px 14px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 8px;
+            color: rgba(255,255,255,0.8);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-bind:hover {
+            background: rgba(255,255,255,0.15);
+        }
+        
+        .btn-bind.bound {
+            color: #fc8181;
+        }
+        
+        .btn-bind.bound:hover {
+            background: rgba(252, 129, 129, 0.2);
+        }
+        
+        /* 退出登录 */
+        .logout-section {
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .btn-logout {
+            width: 100%;
+            padding: 16px;
+            background: rgba(252, 129, 129, 0.15);
+            border: 1px solid rgba(252, 129, 129, 0.3);
+            border-radius: 12px;
+            color: #fc8181;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-logout:hover {
+            background: rgba(252, 129, 129, 0.25);
+        }
+        
+        .btn-guest-login {
+            width: 100%;
+            padding: 16px;
+            background: rgba(102, 126, 234, 0.15);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 12px;
+            color: #667eea;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 12px;
+            transition: all 0.3s;
+        }
+        
+        .btn-guest-login:hover {
+            background: rgba(102, 126, 234, 0.25);
+        }
+        
+        /* Toast */
+        .profile-toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: rgba(0,0,0,0.85);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            z-index: 9999;
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .profile-toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+        
+        .profile-toast.error {
+            background: rgba(220, 38, 38, 0.9);
+        }
+        
+        .profile-toast.success {
+            background: rgba(34, 197, 94, 0.9);
+        }
+        
+        /* 头像上传 */
+        .avatar-input {
+            display: none;
+        }
+        
+        /* Loading */
+        .profile-loading {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 9998;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .profile-loading.show {
+            display: flex;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.2);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="profile-container">
+        <!-- Header -->
+        <header class="profile-header">
+            <button class="btn-back" onclick="goBack()">
+                ← 返回
+            </button>
+            <h1>个人资料</h1>
+            <button class="btn-save" id="btnSave" onclick="saveProfile()">
+                保存
+            </button>
+        </header>
+        
+        <!-- 用户卡片 -->
+        <div class="user-card">
+            <div class="avatar-container">
+                <div class="avatar" id="avatarDisplay">
+                    <span id="avatarEmoji">🏃</span>
+                    <!-- <img id="avatarImg" src="" alt="" style="display:none"> -->
+                </div>
+                <button class="avatar-edit-btn" onclick="changeAvatar()">
+                    📷
+                </button>
+                <input type="file" class="avatar-input" id="avatarInput" 
+                       accept="image/*" onchange="handleAvatarChange(event)">
+            </div>
+            <div class="user-nickname" id="userNickname" style="font-size:20px;font-weight:600;margin-bottom:8px;">
+                运动达人
+            </div>
+            <div class="user-provider-badge" id="providerBadge">
+                游客模式
+            </div>
+        </div>
+        
+        <!-- 升级提示 -->
+        <div class="upgrade-banner" id="upgradeBanner">
+            <div class="upgrade-icon">🚀</div>
+            <div class="upgrade-text">
+                <div class="upgrade-title">升级账号解锁更多功能</div>
+                <div class="upgrade-desc">登录后可云端同步数据，多设备同步</div>
+            </div>
+            <button class="btn-upgrade" onclick="goUpgrade()">
+                立即升级
+            </button>
+        </div>
+        
+        <!-- 基本信息 -->
+        <section class="form-section">
+            <div class="section-title">基本信息</div>
+            <div class="form-card">
+                <div class="form-item">
+                    <label class="form-label">昵称</label>
+                    <div class="form-control">
+                        <input type="text" class="form-input" id="inputNickname" 
+                               placeholder="设置您的昵称" maxlength="20">
+                    </div>
+                </div>
+                
+                <div class="form-item">
+                    <label class="form-label">性别</label>
+                    <div class="form-control">
+                        <div class="gender-select" id="genderSelect">
+                            <div class="gender-option" data-gender="male" onclick="selectGender('male')">
+                                男
+                            </div>
+                            <div class="gender-option" data-gender="female" onclick="selectGender('female')">
+                                女
+                            </div>
+                            <div class="gender-option" data-gender="other" onclick="selectGender('other')">
+                                其他
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-item">
+                    <label class="form-label">生日</label>
+                    <div class="form-control">
+                        <input type="date" class="form-input" id="inputBirthday" 
+                               style="color-scheme: dark;">
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 身体数据 -->
+        <section class="form-section">
+            <div class="section-title">身体数据</div>
+            <div class="form-card">
+                <div class="form-item">
+                    <label class="form-label">身高</label>
+                    <div class="form-control">
+                        <div class="stepper">
+                            <button class="stepper-btn" onclick="adjustValue('height', -1)">−</button>
+                            <span class="stepper-value"><span id="heightValue">170</span> cm</span>
+                            <button class="stepper-btn" onclick="adjustValue('height', 1)">+</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-item">
+                    <label class="form-label">体重</label>
+                    <div class="form-control">
+                        <div class="stepper">
+                            <button class="stepper-btn" onclick="adjustValue('weight', -0.5)">−</button>
+                            <span class="stepper-value"><span id="weightValue">65</span> kg</span>
+                            <button class="stepper-btn" onclick="adjustValue('weight', 0.5)">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 运动目标 -->
+        <section class="form-section">
+            <div class="section-title">运动目标</div>
+            <div class="form-card">
+                <div class="form-item">
+                    <label class="form-label">每日步数</label>
+                    <div class="form-control">
+                        <div class="goal-slider-container">
+                            <input type="range" class="goal-slider" id="stepGoalSlider" 
+                                   min="3000" max="20000" step="1000" 
+                                   value="10000" oninput="updateStepGoal()">
+                            <span class="goal-value" id="stepGoalDisplay">10,000</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-item">
+                    <label class="form-label">消耗卡路里</label>
+                    <div class="form-control">
+                        <div class="goal-slider-container">
+                            <input type="range" class="goal-slider" id="calorieGoalSlider" 
+                                   min="100" max="1000" step="50" 
+                                   value="500" oninput="updateCalorieGoal()">
+                            <span class="goal-value" id="calorieGoalDisplay">500</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 账号绑定 -->
+        <section class="form-section">
+            <div class="section-title">账号绑定</div>
+            <div class="form-card">
+                <div class="account-item">
+                    <span class="account-icon">📱</span>
+                    <div class="account-info">
+                        <div class="account-type">手机号</div>
+                        <div class="account-value unlinked" id="phoneStatus">未绑定</div>
+                    </div>
+                    <button class="btn-bind" id="phoneBindBtn" onclick="bindPhone()">
+                        绑定
+                    </button>
+                </div>
+                
+                <div class="account-item">
+                    <span class="account-icon">✉️</span>
+                    <div class="account-info">
+                        <div class="account-type">邮箱</div>
+                        <div class="account-value unlinked" id="emailStatus">未绑定</div>
+                    </div>
+                    <button class="btn-bind" id="emailBindBtn" onclick="bindEmail()">
+                        绑定
+                    </button>
+                </div>
+                
+                <div class="account-item">
+                    <span class="account-icon">💬</span>
+                    <div class="account-info">
+                        <div class="account-type">微信</div>
+                        <div class="account-value unlinked" id="wechatStatus">未绑定</div>
+                    </div>
+                    <button class="btn-bind" id="wechatBindBtn" onclick="bindWechat()">
+                        绑定
+                    </button>
+                </div>
+                
+                <div class="account-item">
+                    <span class="account-icon">🍎</span>
+                    <div class="account-info">
+                        <div class="account-type">Apple ID</div>
+                        <div class="account-value unlinked" id="appleStatus">未绑定</div>
+                    </div>
+                    <button class="btn-bind" id="appleBindBtn" onclick="bindApple()">
+                        绑定
+                    </button>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 退出登录 -->
+        <section class="logout-section" id="logoutSection">
+            <button class="btn-guest-login" id="btnGuestLogin" onclick="goAuth()" style="display:none;">
+                登录 / 注册账号
+            </button>
+            <button class="btn-logout" id="btnLogout" onclick="handleLogout()">
+                退出登录
+            </button>
+        </section>
+    </div>
+    
+    <!-- Toast -->
+    <div class="profile-toast" id="profileToast">
+        <span id="toastIcon">✓</span>
+        <span id="toastMessage"></span>
+    </div>
+    
+    <!-- Loading -->
+    <div class="profile-loading" id="profileLoading">
+        <div class="spinner"></div>
+    </div>
+
+    <script>
+        // ============ 配置 ============
+        const USER_STORAGE_KEY = 'exercise_user_v4';
+        const AUTH_TOKEN_KEY = 'exercise_auth_token';
+        
+        // ============ 状态 ============
+        let currentUser = null;
+        let hasChanges = false;
+        
+        // ============ 初始化 ============
+        function initProfile() {
+            currentUser = getCurrentUser();
+            
+            if (!currentUser) {
+                // 没有用户，跳转到登录页
+                showToast('请先登录', 'error');
+                setTimeout(() => {
+                    window.location.href = 'auth.html';
+                }, 1000);
+                return;
+            }
+            
+            // 填充表单
+            fillFormData();
+            updateUI();
+        }
+        
+        function getCurrentUser() {
+            try {
+                const user = localStorage.getItem(USER_STORAGE_KEY);
+                return user ? JSON.parse(user) : null;
+            } catch(e) {
+                return null;
+            }
+        }
+        
+        function saveUser(user) {
+            localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+        }
+        
+        // ============ 填充表单 ============
+        function fillFormData() {
+            const user = currentUser;
+            if (!user) return;
+            
+            // 基本信息
+            document.getElementById('userNickname').textContent = user.nickname || '运动达人';
+            document.getElementById('inputNickname').value = user.nickname || '';
+            document.getElementById('avatarEmoji').textContent = getAvatarEmoji(user);
+            
+            // 性别
+            selectGender(user.profile?.gender || 'other');
+            
+            // 生日
+            if (user.profile?.birthday) {
+                document.getElementById('inputBirthday').value = user.profile.birthday;
+            }
+            
+            // 身体数据
+            document.getElementById('heightValue').textContent = user.profile?.height || 170;
+            document.getElementById('weightValue').textContent = user.profile?.weight || 65;
+            
+            // 运动目标
+            const stepTarget = user.profile?.targetSteps || 10000;
+            const calorieTarget = user.profile?.targetCalories || 500;
+            
+            document.getElementById('stepGoalSlider').value = stepTarget;
+            document.getElementById('stepGoalDisplay').textContent = stepTarget.toLocaleString();
+            
+            document.getElementById('calorieGoalSlider').value = calorieTarget;
+            document.getElementById('calorieGoalDisplay').textContent = calorieTarget;
+        }
+        
+        function updateUI() {
+            const user = currentUser;
+            if (!user) return;
+            
+            // Provider徽章
+            const badge = document.getElementById('providerBadge');
+            const providerNames = {
+                'guest': '游客模式',
+                'phone': '手机账号',
+                'email': '邮箱账号',
+                'wechat': '微信账号',
+                'apple': 'Apple账号'
+            };
+            badge.textContent = providerNames[user.provider] || '游客模式';
+            badge.className = 'user-provider-badge' + (user.isGuest ? ' guest' : '');
+            
+            // 升级提示
+            const upgradeBanner = document.getElementById('upgradeBanner');
+            if (user.isGuest) {
+                upgradeBanner.classList.remove('hidden');
+                document.getElementById('btnLogout').style.display = 'none';
+                document.getElementById('btnGuestLogin').style.display = 'block';
+            } else {
+                upgradeBanner.classList.add('hidden');
+                document.getElementById('btnLogout').style.display = 'block';
+                document.getElementById('btnGuestLogin').style.display = 'none';
+            }
+            
+            // 账号绑定状态
+            updateBindStatus('phone', user.phone);
+            updateBindStatus('email', user.email);
+            updateBindStatus('wechat', user.provider === 'wechat' ? '已绑定' : null);
+            updateBindStatus('apple', user.provider === 'apple' ? '已绑定' : null);
+        }
+        
+        function updateBindStatus(type, value) {
+            const statusEl = document.getElementById(type + 'Status');
+            const btnEl = document.getElementById(type + 'BindBtn');
+            
+            if (value) {
+                statusEl.textContent = type === 'phone' ? maskPhone(value) : (type === 'email' ? maskEmail(value) : value);
+                statusEl.className = 'account-value linked';
+                btnEl.textContent = '解绑';
+                btnEl.className = 'btn-bind bound';
+            } else {
+                statusEl.textContent = '未绑定';
+                statusEl.className = 'account-value unlinked';
+                btnEl.textContent = '绑定';
+                btnEl.className = 'btn-bind';
+            }
+        }
+        
+        function maskPhone(phone) {
+            return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+        }
+        
+        function maskEmail(email) {
+            const parts = email.split('@');
+            if (parts.length !== 2) return email;
+            return parts[0].substr(0, 2) + '***@' + parts[1];
+        }
+        
+        function getAvatarEmoji(user) {
+            if (user.profile?.gender === 'male') return '🏃‍♂️';
+            if (user.profile?.gender === 'female') return '🏃‍♀️';
+            return '🏃';
+        }
+        
+        // ============ 表单操作 ============
+        function selectGender(gender) {
+            document.querySelectorAll('.gender-option').forEach(opt => {
+                opt.classList.remove('active');
+                if (opt.dataset.gender === gender) {
+                    opt.classList.add('active');
+                }
+            });
+            markChanged();
+        }
+        
+        function adjustValue(type, delta) {
+            const el = document.getElementById(type + 'Value');
+            let value = parseFloat(el.textContent);
+            
+            if (type === 'height') {
+                value = Math.max(100, Math.min(250, value + delta));
+            } else if (type === 'weight') {
+                value = Math.max(30, Math.min(200, value + delta));
+                value = Math.round(value * 10) / 10;
+            }
+            
+            el.textContent = value;
+            markChanged();
+        }
+        
+        function updateStepGoal() {
+            const slider = document.getElementById('stepGoalSlider');
+            const display = document.getElementById('stepGoalDisplay');
+            display.textContent = parseInt(slider.value).toLocaleString();
+            markChanged();
+        }
+        
+        function updateCalorieGoal() {
+            const slider = document.getElementById('calorieGoalSlider');
+            const display = document.getElementById('calorieGoalDisplay');
+            display.textContent = slider.value;
+            markChanged();
+        }
+        
+        function markChanged() {
+            hasChanges = true;
+        }
+        
+        // 监听输入变化
+        document.getElementById('inputNickname').addEventListener('input', markChanged);
+        document.getElementById('inputBirthday').addEventListener('change', markChanged);
+        
+        // ============ 保存 ============
+        function saveProfile() {
+            if (!hasChanges) {
+                showToast('没有修改', 'info');
+                return;
+            }
+            
+            showLoading(true);
+            
+            // 收集数据
+            const nickname = document.getElementById('inputNickname').value.trim();
+            const gender = document.querySelector('.gender-option.active')?.dataset.gender || 'other';
+            const birthday = document.getElementById('inputBirthday').value;
+            const height = parseFloat(document.getElementById('heightValue').textContent);
+            const weight = parseFloat(document.getElementById('weightValue').textContent);
+            const stepTarget = parseInt(document.getElementById('stepGoalSlider').value);
+            const calorieTarget = parseInt(document.getElementById('calorieGoalSlider').value);
+            
+            // 更新用户对象
+            currentUser.nickname = nickname || '运动达人';
+            currentUser.profile = {
+                ...currentUser.profile,
+                gender: gender,
+                birthday: birthday,
+                height: height,
+                weight: weight,
+                targetSteps: stepTarget,
+                targetCalories: calorieTarget
+            };
+            currentUser.updatedAt = Date.now();
+            
+            // 保存
+            saveUser(currentUser);
+            
+            // 同步到设置（用于主App显示）
+            try {
+                const settings = JSON.parse(localStorage.getItem('exercise_settings_v3') || '{}');
+                settings.stepTarget = stepTarget;
+                settings.stepLength = settings.stepLength || 70;
+                settings.autoAnnounce = settings.autoAnnounce !== false;
+                settings.mapProvider = settings.mapProvider || 'mapbox';
+                localStorage.setItem('exercise_settings_v3', JSON.stringify(settings));
+            } catch(e) {
+                console.warn('同步设置失败:', e);
+            }
+            
+            setTimeout(() => {
+                showLoading(false);
+                hasChanges = false;
+                showToast('保存成功！', 'success');
+                updateUI();
+            }, 800);
+        }
+        
+        // ============ 头像 ============
+        function changeAvatar() {
+            document.getElementById('avatarInput').click();
+        }
+        
+        function handleAvatarChange(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (!file.type.startsWith('image/')) {
+                showToast('请选择图片文件', 'error');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                // 存储头像（Base64）
+                currentUser.avatar = e.target.result;
+                currentUser.updatedAt = Date.now();
+                saveUser(currentUser);
+                
+                // 显示新头像
+                const img = document.getElementById('avatarImg');
+                const emoji = document.getElementById('avatarEmoji');
+                img.src = e.target.result;
+                img.style.display = 'block';
+                emoji.style.display = 'none';
+                
+                showToast('头像已更新', 'success');
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // ============ 账号绑定 ============
+        function bindPhone() {
+            const user = currentUser;
+            if (user.phone || user.provider === 'phone') {
+                // 解绑
+                if (confirm('确定要解绑手机号吗？')) {
+                    user.phone = null;
+                    if (user.provider === 'phone') {
+                        user.provider = 'guest';
+                        user.isGuest = true;
+                    }
+                    saveUser(user);
+                    updateUI();
+                    showToast('已解绑', 'success');
+                }
+            } else {
+                // 跳转到手机绑定
+                showToast('请在登录页面绑定手机号', 'info');
+            }
+        }
+        
+        function bindEmail() {
+            const user = currentUser;
+            if (user.email || user.provider === 'email') {
+                // 解绑
+                if (confirm('确定要解绑邮箱吗？')) {
+                    user.email = null;
+                    if (user.provider === 'email') {
+                        user.provider = 'guest';
+                        user.isGuest = true;
+                    }
+                    saveUser(user);
+                    updateUI();
+                    showToast('已解绑', 'success');
+                }
+            } else {
+                // 跳转到邮箱登录
+                showToast('请在登录页面绑定邮箱', 'info');
+            }
+        }
+        
+        function bindWechat() {
+            if (currentUser.provider === 'wechat') {
+                showToast('微信已绑定', 'info');
+            } else {
+                showToast('请在登录页面使用微信登录', 'info');
+            }
+        }
+        
+        function bindApple() {
+            if (currentUser.provider === 'apple') {
+                showToast('Apple ID已绑定', 'info');
+            } else {
+                showToast('请在登录页面使用Apple登录', 'info');
+            }
+        }
+        
+        // ============ 导航 ============
+        function goBack() {
+            if (hasChanges) {
+                if (!confirm('有未保存的修改，确定要离开吗？')) {
+                    return;
+                }
+            }
+            window.location.href = 'index.html';
+        }
+        
+        function goAuth() {
+            window.location.href = 'auth.html';
+        }
+        
+        function goUpgrade() {
+            window.location.href = 'auth.html';
+        }
+        
+        function handleLogout() {
+            if (!confirm('确定要退出登录吗？\n退出后您可以继续使用游客模式。')) {
+                return;
+            }
+            
+            // 清除登录状态
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+            
+            // 保留用户数据但标记为游客
+            if (currentUser) {
+                currentUser.provider = 'guest';
+                currentUser.isGuest = true;
+                saveUser(currentUser);
+            }
+            
+            showToast('已退出登录', 'success');
+            
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 1000);
+        }
+        
+        // ============ 工具 ============
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('profileToast');
+            const icon = document.getElementById('toastIcon');
+            const msg = document.getElementById('toastMessage');
+            
+            const icons = {
+                success: '✓',
+                error: '✕',
+                info: 'ℹ'
+            };
+            
+            toast.className = 'profile-toast show ' + type;
+            icon.textContent = icons[type] || icons.info;
+            msg.textContent = message;
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2500);
+        }
+        
+        function showLoading(show) {
+            const loading = document.getElementById('profileLoading');
+            if (show) {
+                loading.classList.add('show');
+            } else {
+                loading.classList.remove('show');
+            }
+        }
+        
+        // ============ 启动 ============
+        document.addEventListener('DOMContentLoaded', initProfile);
+    </script>
+</body>
+</html>
